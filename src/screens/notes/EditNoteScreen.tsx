@@ -1,4 +1,4 @@
-// src/screens/notes/CreateNoteScreen.tsx
+// src/screens/notes/EditNoteScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,30 +10,101 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
 import RichTextEditor from '../../components/notes/RichTextEditor';
+import { CombinedNavigationProp, EditNoteRouteProp } from '../../types/navigation';
 
-export default function CreateNoteScreen() {
+// Helper function to convert TipTap JSON to HTML string
+const convertTipTapToHtml = (content: any): string => {
+  if (!content || typeof content !== 'object') {
+    return '';
+  }
+
+  // If it's already an HTML string, return it
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  // If it has an html property, use that
+  if (content.html && typeof content.html === 'string') {
+    return content.html;
+  }
+
+  // Basic TipTap JSON to HTML conversion for common cases
+  if (content.type === 'doc' && content.content) {
+    let html = '';
+    content.content.forEach((node: any) => {
+      if (node.type === 'paragraph') {
+        html += '<p>';
+        if (node.content) {
+          node.content.forEach((textNode: any) => {
+            if (textNode.text) {
+              html += textNode.text;
+            }
+          });
+        }
+        html += '</p>';
+      } else if (node.type === 'heading' && node.content) {
+        const level = node.attrs?.level || 1;
+        html += `<h${level}>`;
+        node.content.forEach((textNode: any) => {
+          if (textNode.text) {
+            html += textNode.text;
+          }
+        });
+        html += `</h${level}>`;
+      }
+    });
+    return html;
+  }
+
+  // Fallback: try to extract text content
+  if (content.content && Array.isArray(content.content)) {
+    let text = '';
+    const extractText = (nodes: any[]) => {
+      nodes.forEach(node => {
+        if (node.text) {
+          text += node.text + ' ';
+        } else if (node.content) {
+          extractText(node.content);
+        }
+      });
+    };
+    extractText(content.content);
+    return text.trim();
+  }
+
+  return '';
+};
+
+export default function EditNoteScreen() {
+  const navigation = useNavigation<CombinedNavigationProp>();
+  const route = useRoute<EditNoteRouteProp>();
+  const { noteId } = route.params;
+
+  const [note, setNote] = useState<any>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('');
   const [tags, setTags] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { fetchNoteById, editNote } = useNotes();
+  const { categories, addCategory } = useCategories();
+  const { tags: availableTags } = useTags();
+
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('blue');
-
-  const { addNote } = useNotes();
-  const { categories, addCategory } = useCategories();
-  const { tags: availableTags } = useTags();
-  const navigation = useNavigation();
 
   const colorOptions = [
     { value: 'blue', label: 'Blue', color: '#3b82f6' },
@@ -46,12 +117,31 @@ export default function CreateNoteScreen() {
     { value: 'gray', label: 'Gray', color: '#6b7280' },
   ];
 
-  // Set default category when categories load
   useEffect(() => {
-    if (categories.length > 0 && !category) {
-      setCategory(categories[0].name);
+    loadNote();
+  }, [noteId]);
+
+  const loadNote = async () => {
+    try {
+      setLoading(true);
+      const noteData = await fetchNoteById(noteId);
+      setNote(noteData);
+      setTitle(noteData.title);
+      
+      // Convert the content properly
+      const htmlContent = convertTipTapToHtml(noteData.content);
+      setContent(htmlContent);
+      
+      setCategory(noteData.category);
+      setTags(noteData.tags ? noteData.tags.join(', ') : '');
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load note');
+      console.error('Error loading note:', err);
+    } finally {
+      setLoading(false);
     }
-  }, [categories, category]);
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -64,27 +154,27 @@ export default function CreateNoteScreen() {
       return;
     }
 
-    setLoading(true);
+    setSaving(true);
     try {
       const tagArray = tags
         .split(',')
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
-      await addNote({
+      await editNote(noteId, {
         title: title.trim(),
-        content: { html: content },
+        content: { html: content }, // Store as object with html property
         category,
         tags: tagArray,
       });
 
-      Alert.alert('Success', 'Note created successfully', [
+      Alert.alert('Success', 'Note updated successfully', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to create note');
+      Alert.alert('Error', 'Failed to update note');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -106,24 +196,6 @@ export default function CreateNoteScreen() {
     }
   };
 
-  const insertTemplate = (templateType: string) => {
-    let template = '';
-    
-    switch (templateType) {
-      case 'soap':
-        template = '<h2>Subjective</h2><p></p><h2>Objective</h2><p></p><h2>Assessment</h2><p></p><h2>Plan</h2><p></p>';
-        break;
-      case 'physical':
-        template = '<h2>Physical Examination</h2><p><strong>Vitals:</strong></p><p><strong>General:</strong></p><p><strong>HEENT:</strong></p><p><strong>Cardiovascular:</strong></p><p><strong>Respiratory:</strong></p><p><strong>Abdominal:</strong></p><p><strong>Extremities:</strong></p><p><strong>Neurological:</strong></p>';
-        break;
-      case 'procedure':
-        template = '<h2>Procedure Note</h2><p><strong>Indication:</strong></p><p><strong>Procedure:</strong></p><p><strong>Technique:</strong></p><p><strong>Findings:</strong></p><p><strong>Complications:</strong></p><p><strong>Post-procedure care:</strong></p>';
-        break;
-    }
-    
-    setContent(template);
-  };
-
   const getTagSuggestions = () => {
     const currentTags = tags.split(',').map(t => t.trim()).filter(Boolean);
     return availableTags
@@ -139,6 +211,44 @@ export default function CreateNoteScreen() {
     }
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.cancelButton}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Loading...</Text>
+          <View style={{ width: 60 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#0ea5e9" />
+          <Text style={styles.loadingText}>Loading note...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.cancelButton}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Error</Text>
+          <View style={{ width: 60 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={loadNote} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -150,15 +260,15 @@ export default function CreateNoteScreen() {
             <Text style={styles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
           
-          <Text style={styles.headerTitle}>New Note</Text>
+          <Text style={styles.headerTitle}>Edit Note</Text>
           
           <TouchableOpacity
             onPress={handleSave}
-            disabled={loading}
-            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+            disabled={saving}
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           >
             <Text style={styles.saveButtonText}>
-              {loading ? 'Saving...' : 'Save'}
+              {saving ? 'Saving...' : 'Save'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -174,25 +284,23 @@ export default function CreateNoteScreen() {
 
           <View style={styles.categoryContainer}>
             <Text style={styles.label}>Category</Text>
-            <View style={styles.categoryRow}>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={category}
-                  onValueChange={(value) => {
-                    if (value === 'add_new') {
-                      setShowCategoryModal(true);
-                    } else {
-                      setCategory(value);
-                    }
-                  }}
-                  style={styles.picker}
-                >
-                  {categories.map(cat => (
-                    <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
-                  ))}
-                  <Picker.Item label="+ Add new category..." value="add_new" />
-                </Picker>
-              </View>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={category}
+                onValueChange={(value) => {
+                  if (value === 'add_new') {
+                    setShowCategoryModal(true);
+                  } else {
+                    setCategory(value);
+                  }
+                }}
+                style={styles.picker}
+              >
+                {categories.map(cat => (
+                  <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
+                ))}
+                <Picker.Item label="+ Add new category..." value="add_new" />
+              </Picker>
             </View>
           </View>
 
@@ -223,31 +331,6 @@ export default function CreateNoteScreen() {
                 </View>
               </View>
             )}
-          </View>
-
-          {/* Template buttons */}
-          <View style={styles.templatesContainer}>
-            <Text style={styles.label}>Quick Templates</Text>
-            <View style={styles.templatesRow}>
-              <TouchableOpacity
-                style={styles.templateButton}
-                onPress={() => insertTemplate('soap')}
-              >
-                <Text style={styles.templateButtonText}>SOAP Note</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.templateButton}
-                onPress={() => insertTemplate('physical')}
-              >
-                <Text style={styles.templateButtonText}>Physical Exam</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.templateButton}
-                onPress={() => insertTemplate('procedure')}
-              >
-                <Text style={styles.templateButtonText}>Procedure</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           <View style={styles.editorContainer}>
@@ -379,12 +462,7 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   pickerContainer: {
-    flex: 1,
     backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
@@ -430,30 +508,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#0ea5e9',
   },
-  templatesContainer: {
-    marginBottom: 15,
-  },
-  templatesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  templateButton: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  templateButtonText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
   editorContainer: {
     flex: 1,
     minHeight: 300,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#0ea5e9',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '500',
   },
   // Modal styles
   modalOverlay: {

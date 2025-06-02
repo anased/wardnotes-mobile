@@ -1,80 +1,234 @@
-import React from 'react';
+// src/screens/notes/NoteDetailScreen.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import useNotes from '../../hooks/useNotes';
+import useCategories from '../../hooks/useCategories';
+import RichTextEditor from '../../components/notes/RichTextEditor';
+import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
+import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
 
 export default function NoteDetailScreen() {
-  const navigation = useNavigation();
-  const route = useRoute();
+  const navigation = useNavigation<CombinedNavigationProp>();
+  const route = useRoute<NoteDetailRouteProp>();
+  const { noteId } = route.params;
   
-  // For now, we'll use placeholder data
-  // Later, we'll get the actual note data using the noteId from route params
-  const noteId = (route.params as any)?.noteId || 'sample-note';
-  
-  // Placeholder note data
-  const sampleNote = {
-    id: noteId,
-    title: 'Sample Medical Note',
-    content: 'This is sample content for a medical note. In the real app, this would show the actual note content from Supabase.',
-    category: 'Cardiology',
-    tags: ['sample', 'demo'],
-    created_at: new Date().toISOString(),
+  const [note, setNote] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const { fetchNoteById, removeNote } = useNotes();
+  const { categories } = useCategories();
+
+  useEffect(() => {
+    loadNote();
+  }, [noteId]);
+
+  const loadNote = async () => {
+    try {
+      setLoading(true);
+      const noteData = await fetchNoteById(noteId);
+      setNote(noteData);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load note');
+      console.error('Error loading note:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = () => {
-    // TODO: Navigate to edit screen when it's implemented
-    console.log('Edit note:', noteId);
+    navigation.navigate('EditNote', { noteId });
   };
 
   const handleDelete = () => {
-    // TODO: Implement delete functionality
-    console.log('Delete note:', noteId);
-    navigation.goBack();
+    Alert.alert(
+      'Delete Note',
+      'Are you sure you want to delete this note? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: confirmDelete },
+      ]
+    );
   };
 
-  const handleBack = () => {
-    navigation.goBack();
+  const confirmDelete = async () => {
+    try {
+      setDeleting(true);
+      await removeNote(noteId);
+      Alert.alert('Success', 'Note deleted successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to delete note');
+    } finally {
+      setDeleting(false);
+    }
   };
+
+  const handleGenerateFlashcards = () => {
+    // This will be implemented when we add premium features
+    Alert.alert('Coming Soon', 'Flashcard generation will be available in the premium version');
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getCategoryColor = (categoryName: string) => {
+    const category = categories.find(cat => cat.name === categoryName);
+    return category?.color || 'blue';
+  };
+
+  const getCategoryBadgeColor = (categoryName: string) => {
+    const color = getCategoryColor(categoryName);
+    const colorMap: Record<string, string> = {
+      blue: '#dbeafe',
+      red: '#fee2e2',
+      green: '#dcfce7',
+      yellow: '#fef3c7',
+      purple: '#f3e8ff',
+      pink: '#fce7f3',
+      indigo: '#e0e7ff',
+      gray: '#f3f4f6',
+    };
+    return colorMap[color] || colorMap.blue;
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#374151" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Loading...</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#0ea5e9" />
+          <Text style={styles.loadingText}>Loading note...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#374151" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Error</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={loadNote} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!note) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#374151" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Not Found</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>Note not found</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
         
         <View style={styles.headerActions}>
+          <PremiumFeatureGate
+            featureName="AI Flashcard Generator"
+            description="Generate Anki-compatible flashcards from this note to boost your learning efficiency."
+          >
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={handleGenerateFlashcards}
+            >
+              <Ionicons name="flash-outline" size={20} color="#0ea5e9" />
+            </TouchableOpacity>
+          </PremiumFeatureGate>
+          
           <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
-            <Text style={styles.actionButtonText}>Edit</Text>
+            <Ionicons name="create-outline" size={20} color="#0ea5e9" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
-            <Text style={[styles.actionButtonText, styles.deleteButton]}>Delete</Text>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleDelete}
+            disabled={deleting}
+          >
+            <Ionicons 
+              name="trash-outline" 
+              size={20} 
+              color={deleting ? "#9ca3af" : "#ef4444"} 
+            />
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={styles.content}>
-        <Text style={styles.title}>{sampleNote.title}</Text>
-        
-        <View style={styles.metadata}>
-          <Text style={styles.date}>
-            {new Date(sampleNote.created_at).toLocaleDateString()}
-          </Text>
-          <Text style={styles.category}>{sampleNote.category}</Text>
+        <View style={styles.noteHeader}>
+          <Text style={styles.title}>{note.title}</Text>
+          
+          <View style={styles.metadata}>
+            <Text style={styles.date}>
+              {formatDate(note.created_at)}
+            </Text>
+            <View style={[
+              styles.categoryBadge, 
+              { backgroundColor: getCategoryBadgeColor(note.category) }
+            ]}>
+              <Text style={styles.categoryText}>{note.category}</Text>
+            </View>
+          </View>
         </View>
 
-        {sampleNote.tags && sampleNote.tags.length > 0 && (
+        {note.tags && note.tags.length > 0 && (
           <View style={styles.tagsContainer}>
             <Text style={styles.tagsLabel}>Tags:</Text>
             <View style={styles.tags}>
-              {sampleNote.tags.map((tag, index) => (
+              {note.tags.map((tag: string, index: number) => (
                 <Text key={index} style={styles.tag}>
                   {tag}
                 </Text>
@@ -85,7 +239,13 @@ export default function NoteDetailScreen() {
 
         <View style={styles.contentContainer}>
           <Text style={styles.contentLabel}>Content:</Text>
-          <Text style={styles.contentText}>{sampleNote.content}</Text>
+          <View style={styles.editorContainer}>
+            <RichTextEditor
+              initialContent={note.content?.html || ''}
+              onContentChange={() => {}}
+              editable={false}
+            />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -106,46 +266,39 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  backButton: {
-    padding: 5,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#0ea5e9',
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
   },
   headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   actionButton: {
     marginLeft: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    padding: 8,
     borderRadius: 6,
-    backgroundColor: '#0ea5e9',
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  deleteButton: {
-    backgroundColor: '#ef4444',
   },
   content: {
     flex: 1,
-    padding: 15,
+    padding: 16,
+  },
+  noteHeader: {
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
-    marginBottom: 10,
+    marginBottom: 12,
+    lineHeight: 32,
   },
   metadata: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
-    paddingBottom: 10,
+    alignItems: 'center',
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
@@ -153,10 +306,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
   },
-  category: {
-    fontSize: 14,
-    color: '#0ea5e9',
+  categoryBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  categoryText: {
+    fontSize: 12,
     fontWeight: '500',
+    color: '#374151',
   },
   tagsContainer: {
     marginBottom: 20,
@@ -188,16 +346,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  contentText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#1f2937',
+  editorContainer: {
     backgroundColor: 'white',
-    padding: 15,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    minHeight: 300,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 12,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#0ea5e9',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '500',
   },
 });

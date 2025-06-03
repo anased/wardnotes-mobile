@@ -1,4 +1,4 @@
-// client.ts
+// src/services/supabase/client.ts
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -7,19 +7,28 @@ const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || 'eyJhbGc
 
 // Custom REST-only Supabase client
 class SupabaseRestClient {
-  private url: string;
-  private key: string;
+  public supabaseUrl: string;
+  public supabaseKey: string;
   private headers: Record<string, string>;
   
   constructor(url: string, key: string) {
-    this.url = url;
-    this.key = key;
+    this.supabaseUrl = url;
+    this.supabaseKey = key;
     this.headers = {
       'apikey': key,
       'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     };
+  }
+
+  // Method to update headers (used by AuthContext)
+  updateHeaders(token: string | null) {
+    if (token) {
+      this.headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      this.headers['Authorization'] = `Bearer ${this.supabaseKey}`;
+    }
   }
 
   // Auth methods
@@ -48,7 +57,7 @@ class SupabaseRestClient {
 
     signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
       try {
-        const response = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
+        const response = await fetch(`${this.supabaseUrl}/auth/v1/token?grant_type=password`, {
           method: 'POST',
           headers: this.headers,
           body: JSON.stringify({ email, password }),
@@ -67,8 +76,8 @@ class SupabaseRestClient {
           expires_at: data.expires_at,
         };
         
-        await AsyncStorage.setItem('supabase.auth.token', JSON.stringify(session));
-        this.headers['Authorization'] = `Bearer ${data.access_token}`;
+        // Don't store here - let AuthContext handle it
+        this.updateHeaders(data.access_token);
         
         return { data: { user: data.user, session }, error: null };
       } catch (error) {
@@ -78,7 +87,7 @@ class SupabaseRestClient {
 
     signUp: async ({ email, password }: { email: string; password: string }) => {
       try {
-        const response = await fetch(`${this.url}/auth/v1/signup`, {
+        const response = await fetch(`${this.supabaseUrl}/auth/v1/signup`, {
           method: 'POST',
           headers: this.headers,
           body: JSON.stringify({ email, password }),
@@ -98,8 +107,15 @@ class SupabaseRestClient {
 
     signOut: async () => {
       try {
-        await AsyncStorage.removeItem('supabase.auth.token');
-        this.headers['Authorization'] = `Bearer ${this.key}`;
+        // Call the logout endpoint
+        await fetch(`${this.supabaseUrl}/auth/v1/logout`, {
+          method: 'POST',
+          headers: this.headers,
+        });
+        
+        // Reset headers
+        this.updateHeaders(null);
+        
         return { error: null };
       } catch (error) {
         return { error };
@@ -109,7 +125,7 @@ class SupabaseRestClient {
 
   // Database methods
   from(table: string) {
-    return new SupabaseTable(this.url, this.headers, table);
+    return new SupabaseTable(this.supabaseUrl, this.headers, table);
   }
 }
 
@@ -268,7 +284,7 @@ class SupabaseTable {
 
 export const supabase = new SupabaseRestClient(supabaseUrl, supabaseAnonKey);
 
-// Types
+// Export the same types as before
 export type Note = {
   id: string;
   user_id: string;
@@ -304,16 +320,12 @@ export type DailyActivity = {
   updated_at: string;
 };
 
-// ======================
-// Note Operations
-// ======================
-
+// Note operations remain the same...
 export const getNotes = async () => {
   const result = await supabase
     .from('notes')
     .select('*')
-    .order('created_at', { ascending: false })
-    .execute();
+    .order('created_at', { ascending: false });
 
   if (result.error) {
     console.error('Error fetching notes:', result.error);
@@ -400,8 +412,7 @@ export const searchNotes = async (query: string) => {
     .from('notes')
     .select('*')
     .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
-    .order('created_at', { ascending: false })
-    .execute();
+    .order('created_at', { ascending: false });
 
   if (result.error) {
     console.error('Error searching notes:', result.error);
@@ -416,8 +427,7 @@ export const filterNotesByCategory = async (category: string) => {
     .from('notes')
     .select('*')
     .eq('category', category)
-    .order('created_at', { ascending: false })
-    .execute();
+    .order('created_at', { ascending: false });
 
   if (result.error) {
     console.error('Error filtering notes by category:', result.error);
@@ -432,8 +442,7 @@ export const filterNotesByTag = async (tag: string) => {
     .from('notes')
     .select('*')
     .contains('tags', [tag])
-    .order('created_at', { ascending: false })
-    .execute();
+    .order('created_at', { ascending: false });
 
   if (result.error) {
     console.error('Error filtering notes by tag:', result.error);
@@ -443,16 +452,12 @@ export const filterNotesByTag = async (tag: string) => {
   return result.data as Note[];
 };
 
-// ======================
-// Category Operations
-// ======================
-
+// Category operations
 export const getCategories = async () => {
   const result = await supabase
     .from('categories')
     .select('*')
-    .order('name', { ascending: true })
-    .execute();
+    .order('name', { ascending: true });
 
   if (result.error) {
     console.error('Error fetching categories:', result.error);
@@ -509,8 +514,7 @@ export const deleteCategory = async (id: string) => {
     .from('notes')
     .select('id')
     .eq('category', id)
-    .limit(1)
-    .execute();
+    .limit(1);
 
   if (notesResult.error) {
     console.error('Error checking if category is in use:', notesResult.error);
@@ -534,16 +538,12 @@ export const deleteCategory = async (id: string) => {
   return true;
 };
 
-// ======================
-// Tag Operations
-// ======================
-
+// Tag operations
 export const getTags = async () => {
   const result = await supabase
     .from('tags')
     .select('*')
-    .order('name', { ascending: true })
-    .execute();
+    .order('name', { ascending: true });
 
   if (result.error) {
     console.error('Error fetching tags:', result.error);
@@ -612,8 +612,7 @@ export const deleteTag = async (id: string) => {
     .from('notes')
     .select('id')
     .contains('tags', [tagName])
-    .limit(1)
-    .execute();
+    .limit(1);
 
   if (notesResult.error) {
     console.error('Error checking if tag is in use:', notesResult.error);
@@ -637,10 +636,7 @@ export const deleteTag = async (id: string) => {
   return true;
 };
 
-// ======================
-// Daily Activity Operations
-// ======================
-
+// Daily Activity operations
 export const getCurrentStreak = async (): Promise<number> => {
   const today = new Date().toISOString().split('T')[0];
   
@@ -664,8 +660,7 @@ export const getActivityForDateRange = async (startDate: string, endDate: string
     .select('*')
     .gte('date', startDate)
     .lte('date', endDate)
-    .order('date', { ascending: true })
-    .execute();
+    .order('date', { ascending: true });
     
   if (result.error) {
     console.error('Error fetching activity for date range:', result.error);

@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import useAuth from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
@@ -27,7 +27,7 @@ export default function AuthScreen() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  // Basic password validation (at least 8 characters)
+  // Password validation (at least 8 characters)
   const isValidPassword = (password: string) => {
     return password.length >= 8;
   };
@@ -57,17 +57,22 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (isSignUp) {
-        const { user } = await signUp(email, password);
-        if (user && !user.email_confirmed_at) {
+        const { user, session } = await signUp(email, password);
+        
+        if (user && !user.email_confirmed_at && !session) {
+          // Email confirmation required
           Alert.alert(
             'Check your email',
             'We\'ve sent you an email with a link to confirm your account. Please check your inbox and click the link to complete the signup process.',
             [{ text: 'OK', onPress: () => setIsSignUp(false) }]
           );
+        } else if (session) {
+          // Successfully signed up and signed in
+          Alert.alert('Welcome!', 'Your account has been created successfully.');
         }
       } else {
         await signIn(email, password);
-        // Navigation will be handled by the auth state change
+        // Navigation will be handled by the auth context state change
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
@@ -109,6 +114,7 @@ export default function AuthScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              editable={!loading}
             />
 
             <TextInput
@@ -118,6 +124,7 @@ export default function AuthScreen() {
               onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
+              editable={!loading}
             />
 
             {isSignUp && (
@@ -128,6 +135,7 @@ export default function AuthScreen() {
                 onChangeText={setConfirmPassword}
                 secureTextEntry
                 autoCapitalize="none"
+                editable={!loading}
               />
             )}
 

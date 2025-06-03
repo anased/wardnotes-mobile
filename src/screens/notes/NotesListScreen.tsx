@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { CombinedNavigationProp } from '../../types/navigation';
@@ -21,6 +23,7 @@ import useTags from '../../hooks/useTags';
 import useAuth from '../../hooks/useAuth';
 
 export default function NotesListScreen() {
+  const { isAuthenticated, loading } = useAuthGuard();
   const navigation = useNavigation<CombinedNavigationProp>();
   const { user } = useAuth();
   const { 

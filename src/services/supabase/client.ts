@@ -20,6 +20,7 @@ class SupabaseRestClient {
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     };
+    console.log('Supabase client initialized in REST-only mode (no realtime)');
   }
 
   // Method to update headers (used by AuthContext)
@@ -192,6 +193,27 @@ class SupabaseTable {
     return this;
   }
 
+  // Make execute public so the exported functions can use it
+  public async execute() {
+    try {
+      const queryString = this.query ? `?select=${this.selectColumns}&${this.query}` : `?select=${this.selectColumns}`;
+      const response = await fetch(`${this.url}/rest/v1/${this.table}${queryString}`, {
+        method: 'GET',
+        headers: this.headers,
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { data: null, error: data };
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
   async single() {
     const result = await this.execute();
     if (result.error) return result;
@@ -260,26 +282,6 @@ class SupabaseTable {
       return { data: null, error };
     }
   }
-
-  private async execute() {
-    try {
-      const queryString = this.query ? `?select=${this.selectColumns}&${this.query}` : `?select=${this.selectColumns}`;
-      const response = await fetch(`${this.url}/rest/v1/${this.table}${queryString}`, {
-        method: 'GET',
-        headers: this.headers,
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        return { data: null, error: data };
-      }
-
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  }
 }
 
 export const supabase = new SupabaseRestClient(supabaseUrl, supabaseAnonKey);
@@ -320,12 +322,13 @@ export type DailyActivity = {
   updated_at: string;
 };
 
-// Note operations remain the same...
+// Note operations
 export const getNotes = async () => {
   const result = await supabase
     .from('notes')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .execute();
 
   if (result.error) {
     console.error('Error fetching notes:', result.error);
@@ -383,21 +386,26 @@ export const updateNote = async (id: string, note: Partial<Omit<Note, 'id' | 'us
     .from('notes')
     .update(note)
     .eq('id', id)
-    .single();
+    .execute();
 
   if (result.error) {
     console.error('Error updating note:', result.error);
     throw result.error;
   }
 
-  return result.data as Note;
+  if (!result.data || result.data.length === 0) {
+    throw new Error('Failed to update note - no data returned');
+  }
+
+  return result.data[0] as Note;
 };
 
 export const deleteNote = async (id: string) => {
   const result = await supabase
     .from('notes')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .execute();
 
   if (result.error) {
     console.error('Error deleting note:', result.error);
@@ -412,7 +420,8 @@ export const searchNotes = async (query: string) => {
     .from('notes')
     .select('*')
     .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .execute();
 
   if (result.error) {
     console.error('Error searching notes:', result.error);
@@ -427,7 +436,8 @@ export const filterNotesByCategory = async (category: string) => {
     .from('notes')
     .select('*')
     .eq('category', category)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .execute();
 
   if (result.error) {
     console.error('Error filtering notes by category:', result.error);
@@ -442,7 +452,8 @@ export const filterNotesByTag = async (tag: string) => {
     .from('notes')
     .select('*')
     .contains('tags', [tag])
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .execute();
 
   if (result.error) {
     console.error('Error filtering notes by tag:', result.error);
@@ -457,7 +468,8 @@ export const getCategories = async () => {
   const result = await supabase
     .from('categories')
     .select('*')
-    .order('name', { ascending: true });
+    .order('name', { ascending: true })
+    .execute();
 
   if (result.error) {
     console.error('Error fetching categories:', result.error);
@@ -499,22 +511,28 @@ export const updateCategory = async (id: string, updates: { name?: string; color
     .from('categories')
     .update(updates)
     .eq('id', id)
-    .single();
+    .execute();
 
   if (result.error) {
     console.error('Error updating category:', result.error);
     throw result.error;
   }
 
-  return result.data as Category;
+  if (!result.data || result.data.length === 0) {
+    throw new Error('Failed to update category - no data returned');
+  }
+
+  return result.data[0] as Category;
 };
 
 export const deleteCategory = async (id: string) => {
+  // First check if category is in use
   const notesResult = await supabase
     .from('notes')
     .select('id')
     .eq('category', id)
-    .limit(1);
+    .limit(1)
+    .execute();
 
   if (notesResult.error) {
     console.error('Error checking if category is in use:', notesResult.error);
@@ -525,10 +543,12 @@ export const deleteCategory = async (id: string) => {
     throw new Error('Cannot delete category that is in use by notes');
   }
 
+  // Delete the category
   const result = await supabase
     .from('categories')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .execute();
 
   if (result.error) {
     console.error('Error deleting category:', result.error);
@@ -543,7 +563,8 @@ export const getTags = async () => {
   const result = await supabase
     .from('tags')
     .select('*')
-    .order('name', { ascending: true });
+    .order('name', { ascending: true })
+    .execute();
 
   if (result.error) {
     console.error('Error fetching tags:', result.error);
@@ -584,17 +605,22 @@ export const updateTag = async (id: string, name: string) => {
     .from('tags')
     .update({ name })
     .eq('id', id)
-    .single();
+    .execute();
 
   if (result.error) {
     console.error('Error updating tag:', result.error);
     throw result.error;
   }
 
-  return result.data as Tag;
+  if (!result.data || result.data.length === 0) {
+    throw new Error('Failed to update tag - no data returned');
+  }
+
+  return result.data[0] as Tag;
 };
 
 export const deleteTag = async (id: string) => {
+  // First get the tag name
   const tagResult = await supabase
     .from('tags')
     .select('name')
@@ -608,11 +634,13 @@ export const deleteTag = async (id: string) => {
 
   const tagName = tagResult.data?.name;
 
+  // Check if tag is in use
   const notesResult = await supabase
     .from('notes')
     .select('id')
     .contains('tags', [tagName])
-    .limit(1);
+    .limit(1)
+    .execute();
 
   if (notesResult.error) {
     console.error('Error checking if tag is in use:', notesResult.error);
@@ -623,10 +651,12 @@ export const deleteTag = async (id: string) => {
     throw new Error('Cannot delete tag that is in use by notes');
   }
 
+  // Delete the tag
   const result = await supabase
     .from('tags')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .execute();
 
   if (result.error) {
     console.error('Error deleting tag:', result.error);
@@ -660,7 +690,8 @@ export const getActivityForDateRange = async (startDate: string, endDate: string
     .select('*')
     .gte('date', startDate)
     .lte('date', endDate)
-    .order('date', { ascending: true });
+    .order('date', { ascending: true })
+    .execute();
     
   if (result.error) {
     console.error('Error fetching activity for date range:', result.error);
@@ -692,4 +723,4 @@ export const getMonthlyActivity = async (): Promise<DailyActivity[]> => {
 };
 
 // Legacy export for compatibility
-export const createClient = () => supabase;
+export const createClient = () => supabase; 

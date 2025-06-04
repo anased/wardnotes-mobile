@@ -9,26 +9,26 @@ import {
   TextInput,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { useAuthGuard } from '../../hooks/useAuthGuard';
-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { CombinedNavigationProp } from '../../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
-import useAuth from '../../hooks/useAuth';
+import LoadingScreen from '../auth/LoadingScreen';
 
 export default function NotesListScreen() {
-  const { isAuthenticated, loading } = useAuthGuard();
+  const { isAuthenticated, loading: authLoading, user } = useAuthGuard();
   const navigation = useNavigation<CombinedNavigationProp>();
-  const { user } = useAuth();
+  
   const { 
     notes, 
-    loading, 
+    loading: notesLoading, 
     error, 
     fetchNotes,
     search,
@@ -43,11 +43,30 @@ export default function NotesListScreen() {
   const [selectedTag, setSelectedTag] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
 
+  // Show loading screen while auth is being checked
+  if (authLoading) {
+    return <LoadingScreen />;
+  }
+
+  // If not authenticated, the useAuthGuard will handle redirect
+  // This is just a fallback
+  if (!isAuthenticated || !user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#0ea5e9" />
+          <Text style={styles.message}>Redirecting to login...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Load notes when user is authenticated
   useEffect(() => {
-    if (user) {
+    if (isAuthenticated && user) {
       fetchNotes();
     }
-  }, [user, fetchNotes]);
+  }, [isAuthenticated, user, fetchNotes]);
 
   const handleNotePress = (noteId: string) => {
     navigation.navigate('NoteDetail', { noteId });
@@ -122,6 +141,21 @@ export default function NotesListScreen() {
     return categoryData?.color || 'blue';
   };
 
+  const getCategoryBadgeColor = (category: string) => {
+    const color = getCategoryColor(category);
+    const colorMap: Record<string, string> = {
+      blue: '#dbeafe',
+      red: '#fee2e2',
+      green: '#dcfce7',
+      yellow: '#fef3c7',
+      purple: '#f3e8ff',
+      pink: '#fce7f3',
+      indigo: '#e0e7ff',
+      gray: '#f3f4f6',
+    };
+    return colorMap[color] || colorMap.blue;
+  };
+
   const renderNoteItem = (note: typeof notes[0]) => (
     <TouchableOpacity
       key={note.id}
@@ -156,35 +190,11 @@ export default function NotesListScreen() {
     </TouchableOpacity>
   );
 
-  const getCategoryBadgeColor = (category: string) => {
-    const color = getCategoryColor(category);
-    const colorMap: Record<string, string> = {
-      blue: '#dbeafe',
-      red: '#fee2e2',
-      green: '#dcfce7',
-      yellow: '#fef3c7',
-      purple: '#f3e8ff',
-      pink: '#fce7f3',
-      indigo: '#e0e7ff',
-      gray: '#f3f4f6',
-    };
-    return colorMap[color] || colorMap.blue;
-  };
-
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContainer}>
-          <Text style={styles.message}>Please sign in to view your notes</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notes Library</Text>
+        <Text style={styles.welcomeText}>Welcome, {user.email}</Text>
       </View>
 
       {/* Search and Filter Section */}
@@ -247,11 +257,15 @@ export default function NotesListScreen() {
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>Error: {error.message}</Text>
+            <TouchableOpacity onPress={fetchNotes} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {loading && !refreshing ? (
+        {notesLoading && !refreshing ? (
           <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#0ea5e9" />
             <Text style={styles.loadingText}>Loading notes...</Text>
           </View>
         ) : notes.length === 0 ? (
@@ -267,6 +281,14 @@ export default function NotesListScreen() {
                 ? 'Try adjusting your filters'
                 : 'Create your first note to get started'}
             </Text>
+            {(!searchQuery && selectedCategory === 'All' && selectedTag === 'All') && (
+              <TouchableOpacity 
+                style={styles.createButton}
+                onPress={() => navigation.navigate('Create' as never)}
+              >
+                <Text style={styles.createButtonText}>Create Your First Note</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={styles.notesContainer}>
@@ -293,6 +315,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4,
   },
   searchContainer: {
     backgroundColor: 'white',
@@ -406,6 +433,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    marginTop: 100,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -424,25 +452,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  createButton: {
+    backgroundColor: '#0ea5e9',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingText: {
     fontSize: 16,
     color: '#6b7280',
+    marginTop: 12,
   },
   errorContainer: {
     backgroundColor: '#fee2e2',
-    padding: 12,
+    padding: 16,
     margin: 16,
     borderRadius: 8,
+    alignItems: 'center',
   },
   errorText: {
     color: '#dc2626',
     fontSize: 14,
     textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
   },
   message: {
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
+    marginTop: 12,
   },
 });

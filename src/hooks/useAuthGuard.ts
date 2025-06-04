@@ -1,7 +1,11 @@
 // src/hooks/useAuthGuard.ts
 import { useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../contexts/AuthContext';
+import { RootStackParamList } from '../types/navigation';
+
+type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 /**
  * Hook to protect screens that require authentication
@@ -9,14 +13,14 @@ import { useAuth } from '../contexts/AuthContext';
  */
 export const useAuthGuard = () => {
   const { user, loading } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
 
   useEffect(() => {
     if (!loading && !user) {
       // Reset navigation stack and navigate to auth
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Auth' as never }],
+        routes: [{ name: 'Auth' }],
       });
     }
   }, [user, loading, navigation]);
@@ -30,14 +34,14 @@ export const useAuthGuard = () => {
  */
 export const useGuestGuard = () => {
   const { user, loading } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
 
   useEffect(() => {
     if (!loading && user) {
       // Reset navigation stack and navigate to main app
       navigation.reset({
         index: 0,
-        routes: [{ name: 'MainTabs' as never }],
+        routes: [{ name: 'MainTabs' }],
       });
     }
   }, [user, loading, navigation]);

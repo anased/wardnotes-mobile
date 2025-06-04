@@ -39,12 +39,8 @@ function DebugLogger() {
       addLog(args.join(' '), 'LOG');
     };
 
-    // Capture React errors
-    const originalHandler = ErrorUtils.getGlobalHandler();
-    ErrorUtils.setGlobalHandler((error, isFatal) => {
-      addLog(`${error.name}: ${error.message}\n${error.stack}`, 'REACT_ERROR');
-      originalHandler(error, isFatal);
-    });
+    // Note: ErrorUtils is not available in React Native by default
+    // Error handling is done through React Error Boundaries instead
 
     return () => {
       console.error = originalError;
@@ -103,7 +99,6 @@ function DebugLogger() {
     </>
   );
 }
-
 
 export default function App() {
   return (

@@ -384,9 +384,8 @@ export const createNote = async (note: Omit<Note, 'id' | 'user_id' | 'created_at
 export const updateNote = async (id: string, note: Partial<Omit<Note, 'id' | 'user_id' | 'created_at'>>) => {
   const result = await supabase
     .from('notes')
-    .update(note)
     .eq('id', id)
-    .execute();
+    .update(note);  
 
   if (result.error) {
     console.error('Error updating note:', result.error);
@@ -403,9 +402,8 @@ export const updateNote = async (id: string, note: Partial<Omit<Note, 'id' | 'us
 export const deleteNote = async (id: string) => {
   const result = await supabase
     .from('notes')
-    .delete()
     .eq('id', id)
-    .execute();
+    .delete();
 
   if (result.error) {
     console.error('Error deleting note:', result.error);
@@ -509,9 +507,8 @@ export const createCategory = async (name: string, color: string = 'blue') => {
 export const updateCategory = async (id: string, updates: { name?: string; color?: string }) => {
   const result = await supabase
     .from('categories')
-    .update(updates)
     .eq('id', id)
-    .execute();
+    .update(updates);
 
   if (result.error) {
     console.error('Error updating category:', result.error);
@@ -546,9 +543,8 @@ export const deleteCategory = async (id: string) => {
   // Delete the category
   const result = await supabase
     .from('categories')
-    .delete()
     .eq('id', id)
-    .execute();
+    .delete();
 
   if (result.error) {
     console.error('Error deleting category:', result.error);
@@ -603,9 +599,8 @@ export const createTag = async (name: string) => {
 export const updateTag = async (id: string, name: string) => {
   const result = await supabase
     .from('tags')
-    .update({ name })
     .eq('id', id)
-    .execute();
+    .update({ name });
 
   if (result.error) {
     console.error('Error updating tag:', result.error);
@@ -654,9 +649,8 @@ export const deleteTag = async (id: string) => {
   // Delete the tag
   const result = await supabase
     .from('tags')
-    .delete()
     .eq('id', id)
-    .execute();
+    .delete();
 
   if (result.error) {
     console.error('Error deleting tag:', result.error);

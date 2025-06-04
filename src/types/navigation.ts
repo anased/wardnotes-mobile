@@ -5,11 +5,12 @@ import { CompositeNavigationProp, RouteProp } from '@react-navigation/native';
 
 // Define the parameter lists for our navigators
 export type RootStackParamList = {
-  Main: undefined;
+  MainTabs: undefined;
   NoteDetail: { noteId: string };
   EditNote: { noteId: string };
   Profile: undefined;
   Auth: undefined;
+  Loading: undefined;
 };
 
 export type MainTabParamList = {

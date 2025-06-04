@@ -18,8 +18,11 @@ import EditNoteScreen from '../../screens/notes/EditNoteScreen';
 import SettingsScreen from '../../screens/settings/SettingsScreen';
 import ProfileScreen from '../../screens/settings/ProfileScreen';
 
-const Stack = createStackNavigator();
-const Tab = createBottomTabNavigator();
+// Import types
+import { RootStackParamList, MainTabParamList } from '../../types/navigation';
+
+const Stack = createStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // Authenticated user's main tabs
 function MainTabs() {
@@ -27,7 +30,7 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: string = 'home';
+          let iconName: keyof typeof Ionicons.glyphMap = 'home';
 
           if (route.name === 'Notes') {
             iconName = focused ? 'library' : 'library-outline';
@@ -37,7 +40,7 @@ function MainTabs() {
             iconName = focused ? 'settings' : 'settings-outline';
           }
 
-          return <Ionicons name={iconName as any} size={size} color={color} />;
+          return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#0ea5e9',
         tabBarInactiveTintColor: 'gray',

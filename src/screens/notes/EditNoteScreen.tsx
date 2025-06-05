@@ -20,69 +20,7 @@ import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
 import RichTextEditor from '../../components/notes/RichTextEditor';
 import { CombinedNavigationProp, EditNoteRouteProp } from '../../types/navigation';
-
-// Helper function to convert TipTap JSON to HTML string
-const convertTipTapToHtml = (content: any): string => {
-  if (!content || typeof content !== 'object') {
-    return '';
-  }
-
-  // If it's already an HTML string, return it
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  // If it has an html property, use that
-  if (content.html && typeof content.html === 'string') {
-    return content.html;
-  }
-
-  // Basic TipTap JSON to HTML conversion for common cases
-  if (content.type === 'doc' && content.content) {
-    let html = '';
-    content.content.forEach((node: any) => {
-      if (node.type === 'paragraph') {
-        html += '<p>';
-        if (node.content) {
-          node.content.forEach((textNode: any) => {
-            if (textNode.text) {
-              html += textNode.text;
-            }
-          });
-        }
-        html += '</p>';
-      } else if (node.type === 'heading' && node.content) {
-        const level = node.attrs?.level || 1;
-        html += `<h${level}>`;
-        node.content.forEach((textNode: any) => {
-          if (textNode.text) {
-            html += textNode.text;
-          }
-        });
-        html += `</h${level}>`;
-      }
-    });
-    return html;
-  }
-
-  // Fallback: try to extract text content
-  if (content.content && Array.isArray(content.content)) {
-    let text = '';
-    const extractText = (nodes: any[]) => {
-      nodes.forEach(node => {
-        if (node.text) {
-          text += node.text + ' ';
-        } else if (node.content) {
-          extractText(node.content);
-        }
-      });
-    };
-    extractText(content.content);
-    return text.trim();
-  }
-
-  return '';
-};
+import { convertContentToHtml, convertHtmlToStorageFormat } from '../../utils/contentUtils';
 
 export default function EditNoteScreen() {
   const navigation = useNavigation<CombinedNavigationProp>();
@@ -125,11 +63,14 @@ export default function EditNoteScreen() {
     try {
       setLoading(true);
       const noteData = await fetchNoteById(noteId);
+      console.log('Loading note for edit:', noteData);
+      
       setNote(noteData);
       setTitle(noteData.title);
       
-      // Convert the content properly
-      const htmlContent = convertTipTapToHtml(noteData.content);
+      // Convert the content to HTML for editing
+      const htmlContent = convertContentToHtml(noteData.content);
+      console.log('Converted content for editing:', htmlContent);
       setContent(htmlContent);
       
       setCategory(noteData.category);
@@ -161,9 +102,16 @@ export default function EditNoteScreen() {
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
+      console.log('Saving note with data:', {
+        title: title.trim(),
+        content: convertHtmlToStorageFormat(content),
+        category,
+        tags: tagArray,
+      });
+
       await editNote(noteId, {
         title: title.trim(),
-        content: { html: content }, // Store as object with html property
+        content: convertHtmlToStorageFormat(content),
         category,
         tags: tagArray,
       });
@@ -172,6 +120,7 @@ export default function EditNoteScreen() {
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
+      console.error('Error updating note:', error);
       Alert.alert('Error', 'Failed to update note');
     } finally {
       setSaving(false);
@@ -185,13 +134,14 @@ export default function EditNoteScreen() {
     }
 
     try {
-      const newCategory = await addCategory(newCategoryName, newCategoryColor);
+      const newCategory = await addCategory(newCategoryName.trim(), newCategoryColor);
       setCategory(newCategory.name);
       setNewCategoryName('');
       setNewCategoryColor('blue');
       setShowCategoryModal(false);
       Alert.alert('Success', 'Category created successfully');
     } catch (error) {
+      console.error('Error creating category:', error);
       Alert.alert('Error', 'Failed to create category');
     }
   };
@@ -354,6 +304,7 @@ export default function EditNoteScreen() {
                 placeholder="Category name"
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
+                autoFocus
               />
 
               <View style={styles.colorSelection}>
@@ -387,6 +338,7 @@ export default function EditNoteScreen() {
                 <TouchableOpacity
                   style={[styles.modalButton, styles.createModalButton]}
                   onPress={handleCreateCategory}
+                  disabled={!newCategoryName.trim()}
                 >
                   <Text style={styles.createModalButtonText}>Create</Text>
                 </TouchableOpacity>

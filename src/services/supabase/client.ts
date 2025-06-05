@@ -1,6 +1,7 @@
 // src/services/supabase/client.ts
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TipTapDocument } from '../../utils/tiptapConverter';
 
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || 'https://fuupwqlinnehbcckhqwi.supabase.co';
 const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1dXB3cWxpbm5laGJjY2tocXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMTU4MzIsImV4cCI6MjA2MTc5MTgzMn0.5kBlJnl90zaqy3Ksy5PeRYRra0quqCHb__FRkaAEUE0';
@@ -291,7 +292,7 @@ export type Note = {
   id: string;
   user_id: string;
   title: string;
-  content: Record<string, unknown>;
+  content: TipTapDocument | { html: string } | Record<string, unknown>; // Allow multiple formats
   tags: string[];
   category: string;
   created_at: string;

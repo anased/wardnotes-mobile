@@ -18,6 +18,7 @@ import { Picker } from '@react-native-picker/picker';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
+import { convertHtmlToStorageFormat } from '../../utils/contentUtils';
 import RichTextEditor from '../../components/notes/RichTextEditor';
 
 export default function CreateNoteScreen() {
@@ -31,7 +32,7 @@ export default function CreateNoteScreen() {
   const [newCategoryColor, setNewCategoryColor] = useState('blue');
 
   const { addNote } = useNotes();
-  const { categories, addCategory } = useCategories();
+  const { categories, addCategory, loading: categoriesLoading } = useCategories();
   const { tags: availableTags } = useTags();
   const navigation = useNavigation();
 
@@ -46,10 +47,40 @@ export default function CreateNoteScreen() {
     { value: 'gray', label: 'Gray', color: '#6b7280' },
   ];
 
+  // Create default categories if none exist
+  useEffect(() => {
+    const createDefaultCategories = async () => {
+      if (!categoriesLoading && categories.length === 0) {
+        try {
+          console.log('Creating default categories...');
+          const defaultCategories = [
+            { name: 'General Medicine', color: 'blue' },
+            { name: 'Cardiology', color: 'red' },
+            { name: 'Neurology', color: 'purple' },
+            { name: 'Surgery', color: 'green' },
+            { name: 'Pediatrics', color: 'yellow' },
+            { name: 'Psychiatry', color: 'indigo' },
+          ];
+          
+          for (const cat of defaultCategories) {
+            await addCategory(cat.name, cat.color);
+          }
+          
+          console.log('Default categories created successfully');
+        } catch (error) {
+          console.error('Error creating default categories:', error);
+        }
+      }
+    };
+
+    createDefaultCategories();
+  }, [categories, categoriesLoading, addCategory]);
+
   // Set default category when categories load
   useEffect(() => {
     if (categories.length > 0 && !category) {
       setCategory(categories[0].name);
+      console.log('Set default category to:', categories[0].name);
     }
   }, [categories, category]);
 
@@ -71,9 +102,16 @@ export default function CreateNoteScreen() {
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
+      console.log('Creating note with data:', {
+        title: title.trim(),
+        content: convertHtmlToStorageFormat(content),
+        category,
+        tags: tagArray,
+      });
+
       await addNote({
         title: title.trim(),
-        content: { html: content },
+        content: convertHtmlToStorageFormat(content),
         category,
         tags: tagArray,
       });
@@ -82,6 +120,7 @@ export default function CreateNoteScreen() {
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
+      console.error('Error creating note:', error);
       Alert.alert('Error', 'Failed to create note');
     } finally {
       setLoading(false);
@@ -95,13 +134,15 @@ export default function CreateNoteScreen() {
     }
 
     try {
-      const newCategory = await addCategory(newCategoryName, newCategoryColor);
+      console.log('Creating new category:', newCategoryName, newCategoryColor);
+      const newCategory = await addCategory(newCategoryName.trim(), newCategoryColor);
       setCategory(newCategory.name);
       setNewCategoryName('');
       setNewCategoryColor('blue');
       setShowCategoryModal(false);
       Alert.alert('Success', 'Category created successfully');
     } catch (error) {
+      console.error('Error creating category:', error);
       Alert.alert('Error', 'Failed to create category');
     }
   };
@@ -139,6 +180,13 @@ export default function CreateNoteScreen() {
     }
   };
 
+  console.log('Current state:', {
+    categoriesLoading,
+    categoriesCount: categories.length,
+    selectedCategory: category,
+    categories: categories.map(c => c.name)
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -174,26 +222,46 @@ export default function CreateNoteScreen() {
 
           <View style={styles.categoryContainer}>
             <Text style={styles.label}>Category</Text>
-            <View style={styles.categoryRow}>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={category}
-                  onValueChange={(value) => {
-                    if (value === 'add_new') {
-                      setShowCategoryModal(true);
-                    } else {
-                      setCategory(value);
-                    }
-                  }}
-                  style={styles.picker}
-                >
-                  {categories.map(cat => (
-                    <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
-                  ))}
-                  <Picker.Item label="+ Add new category..." value="add_new" />
-                </Picker>
+            {categoriesLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading categories...</Text>
               </View>
-            </View>
+            ) : (
+              <View style={styles.categoryRow}>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={category}
+                    onValueChange={(value) => {
+                      console.log('Category picker value changed to:', value);
+                      if (value === 'add_new') {
+                        setShowCategoryModal(true);
+                      } else {
+                        setCategory(value);
+                      }
+                    }}
+                    style={styles.picker}
+                    enabled={!categoriesLoading}
+                  >
+                    {categories.length === 0 && (
+                      <Picker.Item label="No categories available" value="" />
+                    )}
+                    {categories.map(cat => (
+                      <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
+                    ))}
+                    <Picker.Item label="+ Add new category..." value="add_new" />
+                  </Picker>
+                </View>
+              </View>
+            )}
+            
+            {/* Manual category creation button if picker fails */}
+            <TouchableOpacity 
+              style={styles.manualCategoryButton}
+              onPress={() => setShowCategoryModal(true)}
+            >
+              <Ionicons name="add-circle-outline" size={16} color="#0ea5e9" />
+              <Text style={styles.manualCategoryButtonText}>Create New Category</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.tagsContainer}>
@@ -271,6 +339,7 @@ export default function CreateNoteScreen() {
                 placeholder="Category name"
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
+                autoFocus
               />
 
               <View style={styles.colorSelection}>
@@ -304,6 +373,7 @@ export default function CreateNoteScreen() {
                 <TouchableOpacity
                   style={[styles.modalButton, styles.createModalButton]}
                   onPress={handleCreateCategory}
+                  disabled={!newCategoryName.trim()}
                 >
                   <Text style={styles.createModalButtonText}>Create</Text>
                 </TouchableOpacity>
@@ -379,6 +449,18 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
+  loadingContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    padding: 15,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -392,6 +474,25 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
+  },
+  manualCategoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#0ea5e9',
+    borderStyle: 'dashed',
+  },
+  manualCategoryButtonText: {
+    color: '#0ea5e9',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
   },
   tagsContainer: {
     marginBottom: 15,

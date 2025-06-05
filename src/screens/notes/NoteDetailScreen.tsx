@@ -17,6 +17,139 @@ import useCategories from '../../hooks/useCategories';
 import RichTextEditor from '../../components/notes/RichTextEditor';
 import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
 import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
+import { convertContentToHtml } from '../../utils/contentUtils';
+
+// Helper function to convert content to HTML
+const getContentAsHtml = (content: any): string => {
+  console.log('Raw content:', content);
+  
+  if (!content) {
+    return '';
+  }
+
+  // If it's already a string, return it
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  // If it has an html property, use that
+  if (content.html && typeof content.html === 'string') {
+    return content.html;
+  }
+
+  // If it's a TipTap JSON structure
+  if (content.type === 'doc' && content.content) {
+    let html = '';
+    content.content.forEach((node: any) => {
+      if (node.type === 'paragraph') {
+        html += '<p>';
+        if (node.content) {
+          node.content.forEach((textNode: any) => {
+            if (textNode.text) {
+              let text = textNode.text;
+              
+              // Apply marks (bold, italic, etc.)
+              if (textNode.marks) {
+                textNode.marks.forEach((mark: any) => {
+                  if (mark.type === 'bold') {
+                    text = `<strong>${text}</strong>`;
+                  } else if (mark.type === 'italic') {
+                    text = `<em>${text}</em>`;
+                  } else if (mark.type === 'underline') {
+                    text = `<u>${text}</u>`;
+                  }
+                });
+              }
+              
+              html += text;
+            }
+          });
+        }
+        html += '</p>';
+      } else if (node.type === 'heading' && node.content) {
+        const level = node.attrs?.level || 1;
+        html += `<h${level}>`;
+        node.content.forEach((textNode: any) => {
+          if (textNode.text) {
+            html += textNode.text;
+          }
+        });
+        html += `</h${level}>`;
+      } else if (node.type === 'bulletList' && node.content) {
+        html += '<ul>';
+        node.content.forEach((listItem: any) => {
+          if (listItem.type === 'listItem' && listItem.content) {
+            html += '<li>';
+            listItem.content.forEach((paragraph: any) => {
+              if (paragraph.content) {
+                paragraph.content.forEach((textNode: any) => {
+                  if (textNode.text) {
+                    html += textNode.text;
+                  }
+                });
+              }
+            });
+            html += '</li>';
+          }
+        });
+        html += '</ul>';
+      } else if (node.type === 'orderedList' && node.content) {
+        html += '<ol>';
+        node.content.forEach((listItem: any) => {
+          if (listItem.type === 'listItem' && listItem.content) {
+            html += '<li>';
+            listItem.content.forEach((paragraph: any) => {
+              if (paragraph.content) {
+                paragraph.content.forEach((textNode: any) => {
+                  if (textNode.text) {
+                    html += textNode.text;
+                  }
+                });
+              }
+            });
+            html += '</li>';
+          }
+        });
+        html += '</ol>';
+      }
+    });
+    return html;
+  }
+
+  // If it's a simple object with text content, try to extract it
+  if (typeof content === 'object') {
+    // Try to find text content recursively
+    const extractText = (obj: any): string => {
+      if (typeof obj === 'string') return obj;
+      if (Array.isArray(obj)) {
+        return obj.map(extractText).join(' ');
+      }
+      if (obj && typeof obj === 'object') {
+        if (obj.text) return obj.text;
+        return Object.values(obj).map(extractText).join(' ');
+      }
+      return '';
+    };
+    
+    const extractedText = extractText(content);
+    if (extractedText.trim()) {
+      // Convert plain text to HTML paragraphs
+      return extractedText
+        .split('\n\n')
+        .filter(p => p.trim())
+        .map(p => `<p>${p.trim()}</p>`)
+        .join('');
+    }
+  }
+
+  // Fallback: convert to string and wrap in paragraph
+  const fallbackText = String(content);
+  if (fallbackText && fallbackText !== '[object Object]') {
+    return `<p>${fallbackText}</p>`;
+  }
+
+  return '';
+};
 
 export default function NoteDetailScreen() {
   const navigation = useNavigation<CombinedNavigationProp>();
@@ -39,6 +172,7 @@ export default function NoteDetailScreen() {
     try {
       setLoading(true);
       const noteData = await fetchNoteById(noteId);
+      console.log('Loaded note data:', noteData);
       setNote(noteData);
       setError(null);
     } catch (err: any) {
@@ -79,7 +213,6 @@ export default function NoteDetailScreen() {
   };
 
   const handleGenerateFlashcards = () => {
-    // This will be implemented when we add premium features
     Alert.alert('Coming Soon', 'Flashcard generation will be available in the premium version');
   };
 
@@ -169,6 +302,10 @@ export default function NoteDetailScreen() {
     );
   }
 
+  // Get the HTML content for display
+  const htmlContent = convertContentToHtml(note.content);
+  console.log('Converted HTML content:', htmlContent);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -239,13 +376,23 @@ export default function NoteDetailScreen() {
 
         <View style={styles.contentContainer}>
           <Text style={styles.contentLabel}>Content:</Text>
-          <View style={styles.editorContainer}>
-            <RichTextEditor
-              initialContent={note.content?.html || ''}
-              onContentChange={() => {}}
-              editable={false}
-            />
-          </View>
+          {htmlContent ? (
+            <View style={styles.editorContainer}>
+              <RichTextEditor
+                initialContent={htmlContent}
+                onContentChange={() => {}}
+                editable={false}
+              />
+            </View>
+          ) : (
+            <View style={styles.noContentContainer}>
+              <Ionicons name="document-outline" size={48} color="#d1d5db" />
+              <Text style={styles.noContentText}>No content available</Text>
+              <Text style={styles.noContentSubtext}>
+                This note appears to be empty or the content format is not supported.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -354,6 +501,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     minHeight: 300,
+  },
+  noContentContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    minHeight: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  noContentText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#9ca3af',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  noContentSubtext: {
+    fontSize: 14,
+    color: '#d1d5db',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   centerContainer: {
     flex: 1,

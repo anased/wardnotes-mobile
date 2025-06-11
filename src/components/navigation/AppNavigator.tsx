@@ -18,6 +18,7 @@ import EditNoteScreen from '../../screens/notes/EditNoteScreen';
 import SettingsScreen from '../../screens/settings/SettingsScreen';
 import ProfileScreen from '../../screens/settings/ProfileScreen';
 import LearningTrackerScreen from '../../screens/learning-tracker/LearningTrackerScreen'; // Add this import
+import NotificationSettingsScreen from '../../screens/settings/NotificationSettingsScreen';
 
 // Import types
 import { RootStackParamList, MainTabParamList } from '../../types/navigation';
@@ -102,6 +103,11 @@ function AuthenticatedNavigator() {
         name="Profile" 
         component={ProfileScreen}
         options={{ title: 'Profile' }}
+      />
+      <Stack.Screen 
+        name="NotificationSettings" 
+        component={NotificationSettingsScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

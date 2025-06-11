@@ -11,6 +11,7 @@ export type RootStackParamList = {
   Profile: undefined;
   Auth: undefined;
   Loading: undefined;
+  NotificationSettings: undefined;
 };
 
 export type MainTabParamList = {

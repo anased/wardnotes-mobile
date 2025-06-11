@@ -45,7 +45,9 @@ export default function SettingsScreen() {
   const navigateToProfile = () => {
     navigation.navigate('Profile');
   };
-
+  const navigateToNotifications = () => {
+    navigation.navigate('NotificationSettings');
+  };
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
@@ -76,7 +78,7 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App Settings</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={styles.settingItem} onPress={navigateToNotifications}>
             <View style={styles.settingLeft}>
               <View style={styles.iconContainer}>
                 <Ionicons name="notifications-outline" size={20} color="#0ea5e9" />

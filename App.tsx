@@ -4,6 +4,7 @@ import './src/polyfills';
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import notificationService from './src/services/notifications/notificationService';
 
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/contexts/AuthContext';
@@ -101,6 +102,10 @@ function DebugLogger() {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Initialize notifications when app starts
+    notificationService.initialize();
+  }, []);
   return (
     <>
       <AuthProvider>

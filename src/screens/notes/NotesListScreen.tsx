@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +22,8 @@ import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
 import LoadingScreen from '../auth/LoadingScreen';
+import { getNotes } from '../../services/supabase/client';
+import { Note } from '../../services/supabase/client';
 
 export default function NotesListScreen() {
   const { isAuthenticated, loading: authLoading, user } = useAuthGuard();
@@ -28,6 +31,7 @@ export default function NotesListScreen() {
   
   const { 
     notes, 
+    setNotes,
     loading: notesLoading, 
     error, 
     fetchNotes,
@@ -42,6 +46,9 @@ export default function NotesListScreen() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedTag, setSelectedTag] = useState('All');
   const [refreshing, setRefreshing] = useState(false);
+
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showTagPicker, setShowTagPicker] = useState(false);
 
   // Show loading screen while auth is being checked
   if (authLoading) {
@@ -72,23 +79,71 @@ export default function NotesListScreen() {
     navigation.navigate('NoteDetail', { noteId });
   };
 
+  
+  const applyFiltersClientSide = async (categoryOverride?: string, tagOverride?: string, searchOverride?: string) => {
+    try {
+      const allNotes = await getNotes();
+      let filteredNotes = [...allNotes];
+  
+      // Use override values if provided, otherwise use state
+      const currentCategory = categoryOverride !== undefined ? categoryOverride : selectedCategory;
+      const currentTag = tagOverride !== undefined ? tagOverride : selectedTag;
+      const currentSearch = searchOverride !== undefined ? searchOverride : searchQuery;
+  
+      // Apply category filter
+      if (currentCategory !== 'All') {
+        filteredNotes = filteredNotes.filter(note => note.category === currentCategory);
+      }
+  
+      // Apply tag filter
+      if (currentTag !== 'All') {
+        filteredNotes = filteredNotes.filter(note => 
+          note.tags && note.tags.includes && note.tags.includes(currentTag)
+        );
+      }
+  
+      // Apply search filter
+      if (currentSearch && currentSearch.trim()) {
+        const searchTerm = currentSearch.trim().toLowerCase();
+        filteredNotes = filteredNotes.filter(note => {
+          const titleText = note.title || '';
+          const titleMatch = titleText.toLowerCase().includes(searchTerm);
+          
+          let contentMatch = false;
+          if (note.content) {
+            try {
+              const contentAsString = JSON.stringify(note.content);
+              contentMatch = contentAsString.toLowerCase().includes(searchTerm);
+            } catch {
+              contentMatch = false;
+            }
+          }
+          
+          return titleMatch || contentMatch;
+        });
+      }
+  
+      setNotes(filteredNotes);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to apply filters');
+      console.error('Filter error:', err);
+    }
+  };
+
   const handleSearch = async () => {
     try {
-      await search(searchQuery);
-      setSelectedCategory('All');
-      setSelectedTag('All');
+      // Pass the current search query directly
+      await applyFiltersClientSide(selectedCategory, selectedTag, searchQuery);
     } catch (err) {
       Alert.alert('Error', 'Failed to search notes');
     }
   };
-
   const handleCategoryFilter = async (category: string) => {
     setSelectedCategory(category);
-    setSelectedTag('All');
-    setSearchQuery('');
     
     try {
-      await filterByCategory(category);
+      // Pass the new category value directly instead of relying on state
+      await applyFiltersClientSide(category, selectedTag, searchQuery);
     } catch (err) {
       Alert.alert('Error', 'Failed to filter by category');
     }
@@ -96,15 +151,10 @@ export default function NotesListScreen() {
 
   const handleTagFilter = async (tag: string) => {
     setSelectedTag(tag);
-    setSelectedCategory('All');
-    setSearchQuery('');
     
     try {
-      if (tag === 'All') {
-        await fetchNotes();
-      } else {
-        await filterByTag(tag);
-      }
+      // Pass the new tag value directly instead of relying on state
+      await applyFiltersClientSide(selectedCategory, tag, searchQuery);
     } catch (err) {
       Alert.alert('Error', 'Failed to filter by tag');
     }
@@ -214,31 +264,33 @@ export default function NotesListScreen() {
         </View>
 
         <View style={styles.filtersRow}>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedCategory}
-              onValueChange={handleCategoryFilter}
-              style={styles.picker}
-            >
-              <Picker.Item label="All Categories" value="All" />
-              {categories.map(cat => (
-                <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
-              ))}
-            </Picker>
-          </View>
+          {/* Custom Category Picker */}
+          <TouchableOpacity 
+            style={styles.customPickerButton}
+            onPress={() => setShowCategoryPicker(true)}
+          >
+            <Text style={[
+              styles.customPickerText,
+              { color: selectedCategory === 'All' ? '#9ca3af' : '#1f2937' }
+            ]}>
+              {selectedCategory === 'All' ? 'All Categories' : selectedCategory}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+          </TouchableOpacity>
 
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedTag}
-              onValueChange={handleTagFilter}
-              style={styles.picker}
-            >
-              <Picker.Item label="All Tags" value="All" />
-              {tags.map(tag => (
-                <Picker.Item key={tag.id} label={tag.name} value={tag.name} />
-              ))}
-            </Picker>
-          </View>
+          {/* Custom Tag Picker */}
+          <TouchableOpacity 
+            style={styles.customPickerButton}
+            onPress={() => setShowTagPicker(true)}
+          >
+            <Text style={[
+              styles.customPickerText,
+              { color: selectedTag === 'All' ? '#9ca3af' : '#1f2937' }
+            ]}>
+              {selectedTag === 'All' ? 'All Tags' : selectedTag}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+          </TouchableOpacity>
         </View>
 
         {(selectedCategory !== 'All' || selectedTag !== 'All' || searchQuery) && (
@@ -247,7 +299,132 @@ export default function NotesListScreen() {
           </TouchableOpacity>
         )}
       </View>
-
+      {/* Category Picker Modal */}
+      <Modal 
+        visible={showCategoryPicker} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setShowCategoryPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Category</Text>
+              <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScrollView}>
+              <TouchableOpacity
+                style={[
+                  styles.modalItem,
+                  selectedCategory === 'All' && styles.selectedModalItem
+                ]}
+                onPress={() => {
+                  handleCategoryFilter('All');
+                  setShowCategoryPicker(false);
+                }}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  selectedCategory === 'All' && styles.selectedModalItemText
+                ]}>
+                  All Categories
+                </Text>
+                {selectedCategory === 'All' && (
+                  <Ionicons name="checkmark" size={20} color="#0ea5e9" />
+                )}
+              </TouchableOpacity>
+              {categories.map(cat => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.modalItem,
+                    selectedCategory === cat.name && styles.selectedModalItem
+                  ]}
+                  onPress={() => {
+                    handleCategoryFilter(cat.name);
+                    setShowCategoryPicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.modalItemText,
+                    selectedCategory === cat.name && styles.selectedModalItemText
+                  ]}>
+                    {cat.name}
+                  </Text>
+                  {selectedCategory === cat.name && (
+                    <Ionicons name="checkmark" size={20} color="#0ea5e9" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      {/* Tag Picker Modal */}
+      <Modal 
+        visible={showTagPicker} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setShowTagPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Tag</Text>
+              <TouchableOpacity onPress={() => setShowTagPicker(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScrollView}>
+              <TouchableOpacity
+                style={[
+                  styles.modalItem,
+                  selectedTag === 'All' && styles.selectedModalItem
+                ]}
+                onPress={() => {
+                  handleTagFilter('All');
+                  setShowTagPicker(false);
+                }}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  selectedTag === 'All' && styles.selectedModalItemText
+                ]}>
+                  All Tags
+                </Text>
+                {selectedTag === 'All' && (
+                  <Ionicons name="checkmark" size={20} color="#0ea5e9" />
+                )}
+              </TouchableOpacity>
+              {tags.map(tag => (
+                <TouchableOpacity
+                  key={tag.id}
+                  style={[
+                    styles.modalItem,
+                    selectedTag === tag.name && styles.selectedModalItem
+                  ]}
+                  onPress={() => {
+                    handleTagFilter(tag.name);
+                    setShowTagPicker(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.modalItemText,
+                    selectedTag === tag.name && styles.selectedModalItemText
+                  ]}>
+                    {tag.name}
+                  </Text>
+                  {selectedTag === tag.name && (
+                    <Ionicons name="checkmark" size={20} color="#0ea5e9" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       <ScrollView 
         style={styles.content}
         refreshControl={
@@ -345,16 +522,75 @@ const styles = StyleSheet.create({
   filtersRow: {
     flexDirection: 'row',
     gap: 8,
+    marginTop: 4, // Add margin for better spacing
   },
-  pickerContainer: {
+  customPickerButton: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
     backgroundColor: '#f9fafb',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#d1d5db',
+    minHeight: 50,
   },
-  picker: {
-    height: 50,
+  customPickerText: {
+    fontSize: 16,
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  modalScrollView: {
+    maxHeight: 300,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  selectedModalItem: {
+    backgroundColor: '#f0f9ff',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#1f2937',
+    flex: 1,
+  },
+  selectedModalItemText: {
+    color: '#0ea5e9',
+    fontWeight: '500',
+  },
+  pickerItem: {
+    color: '#1f2937',
+    fontSize: 16,
+    fontWeight: '400',
   },
   clearButton: {
     alignSelf: 'center',

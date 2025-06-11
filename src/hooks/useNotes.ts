@@ -154,6 +154,7 @@ export default function useNotes() {
 
   return {
     notes,
+    setNotes,
     loading,
     error,
     fetchNotes,

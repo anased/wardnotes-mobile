@@ -10,16 +10,149 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { Picker } from '@react-native-picker/picker';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
 import { convertHtmlToStorageFormat } from '../../utils/contentUtils';
 import RichTextEditor from '../../components/notes/RichTextEditor';
+
+// Custom Category Picker Component
+interface CategoryPickerProps {
+  categories: Array<{ id: string; name: string; color: string }>;
+  selectedCategory: string;
+  onCategorySelect: (categoryName: string) => void;
+  onAddNewCategory: () => void;
+  disabled?: boolean;
+}
+
+const CategoryPicker: React.FC<CategoryPickerProps> = ({
+  categories,
+  selectedCategory,
+  onCategorySelect,
+  onAddNewCategory,
+  disabled = false
+}) => {
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleCategorySelect = (categoryName: string) => {
+    if (categoryName === 'add_new') {
+      setIsModalVisible(false);
+      onAddNewCategory();
+    } else {
+      onCategorySelect(categoryName);
+      setIsModalVisible(false);
+    }
+  };
+
+  const getCategoryColor = (categoryName: string) => {
+    const category = categories.find(cat => cat.name === categoryName);
+    const color = category?.color || 'blue';
+    const colorMap: Record<string, string> = {
+      blue: '#3b82f6',
+      red: '#ef4444',
+      green: '#10b981',
+      yellow: '#f59e0b',
+      purple: '#8b5cf6',
+      pink: '#ec4899',
+      indigo: '#6366f1',
+      gray: '#6b7280',
+    };
+    return colorMap[color] || colorMap.blue;
+  };
+
+  return (
+    <>
+      <TouchableOpacity
+        style={[styles.categoryPickerButton, disabled && styles.categoryPickerDisabled]}
+        onPress={() => !disabled && setIsModalVisible(true)}
+        disabled={disabled}
+      >
+        <View style={styles.categoryPickerContent}>
+          {selectedCategory ? (
+            <View style={styles.selectedCategoryContainer}>
+              <View 
+                style={[
+                  styles.categoryColorDot, 
+                  { backgroundColor: getCategoryColor(selectedCategory) }
+                ]} 
+              />
+              <Text style={styles.selectedCategoryText}>{selectedCategory}</Text>
+            </View>
+          ) : (
+            <Text style={styles.categoryPickerPlaceholder}>Select a category</Text>
+          )}
+          <Ionicons name="chevron-down" size={20} color="#6b7280" />
+        </View>
+      </TouchableOpacity>
+
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.categoryModalContent}>
+            <View style={styles.categoryModalHeader}>
+              <Text style={styles.categoryModalTitle}>Select Category</Text>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.categoryList}>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.categoryOption,
+                    selectedCategory === category.name && styles.selectedCategoryOption
+                  ]}
+                  onPress={() => handleCategorySelect(category.name)}
+                >
+                  <View style={styles.categoryOptionContent}>
+                    <View 
+                      style={[
+                        styles.categoryColorDot, 
+                        { backgroundColor: getCategoryColor(category.name) }
+                      ]} 
+                    />
+                    <Text style={[
+                      styles.categoryOptionText,
+                      selectedCategory === category.name && styles.selectedCategoryOptionText
+                    ]}>
+                      {category.name}
+                    </Text>
+                  </View>
+                  {selectedCategory === category.name && (
+                    <Ionicons name="checkmark" size={20} color="#0ea5e9" />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                style={styles.addCategoryOption}
+                onPress={() => handleCategorySelect('add_new')}
+              >
+                <View style={styles.categoryOptionContent}>
+                  <View style={styles.addCategoryIcon}>
+                    <Ionicons name="add" size={16} color="#0ea5e9" />
+                  </View>
+                  <Text style={styles.addCategoryText}>Add new category...</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+};
 
 export default function CreateNoteScreen() {
   const [title, setTitle] = useState('');
@@ -227,41 +360,14 @@ export default function CreateNoteScreen() {
                 <Text style={styles.loadingText}>Loading categories...</Text>
               </View>
             ) : (
-              <View style={styles.categoryRow}>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={category}
-                    onValueChange={(value) => {
-                      console.log('Category picker value changed to:', value);
-                      if (value === 'add_new') {
-                        setShowCategoryModal(true);
-                      } else {
-                        setCategory(value);
-                      }
-                    }}
-                    style={styles.picker}
-                    enabled={!categoriesLoading}
-                  >
-                    {categories.length === 0 && (
-                      <Picker.Item label="No categories available" value="" />
-                    )}
-                    {categories.map(cat => (
-                      <Picker.Item key={cat.id} label={cat.name} value={cat.name} />
-                    ))}
-                    <Picker.Item label="+ Add new category..." value="add_new" />
-                  </Picker>
-                </View>
-              </View>
+              <CategoryPicker
+                categories={categories}
+                selectedCategory={category}
+                onCategorySelect={setCategory}
+                onAddNewCategory={() => setShowCategoryModal(true)}
+                disabled={categoriesLoading}
+              />
             )}
-            
-            {/* Manual category creation button if picker fails */}
-            <TouchableOpacity 
-              style={styles.manualCategoryButton}
-              onPress={() => setShowCategoryModal(true)}
-            >
-              <Ionicons name="add-circle-outline" size={16} color="#0ea5e9" />
-              <Text style={styles.manualCategoryButtonText}>Create New Category</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.tagsContainer}>
@@ -330,56 +436,63 @@ export default function CreateNoteScreen() {
 
         {/* Category Creation Modal */}
         {showCategoryModal && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Create New Category</Text>
-              
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Category name"
-                value={newCategoryName}
-                onChangeText={setNewCategoryName}
-                autoFocus
-              />
+          <Modal
+            visible={showCategoryModal}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowCategoryModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Create New Category</Text>
+                
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Category name"
+                  value={newCategoryName}
+                  onChangeText={setNewCategoryName}
+                  autoFocus
+                />
 
-              <View style={styles.colorSelection}>
-                <Text style={styles.modalLabel}>Color</Text>
-                <View style={styles.colorRow}>
-                  {colorOptions.map((color) => (
-                    <TouchableOpacity
-                      key={color.value}
-                      style={[
-                        styles.colorOption,
-                        { backgroundColor: color.color },
-                        newCategoryColor === color.value && styles.selectedColor
-                      ]}
-                      onPress={() => setNewCategoryColor(color.value)}
-                    />
-                  ))}
+                <View style={styles.colorSelection}>
+                  <Text style={styles.modalLabel}>Color</Text>
+                  <View style={styles.colorRow}>
+                    {colorOptions.map((color) => (
+                      <TouchableOpacity
+                        key={color.value}
+                        style={[
+                          styles.colorOption,
+                          { backgroundColor: color.color },
+                          newCategoryColor === color.value && styles.selectedColor
+                        ]}
+                        onPress={() => setNewCategoryColor(color.value)}
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelModalButton]}
+                    onPress={() => {
+                      setShowCategoryModal(false);
+                      setNewCategoryName('');
+                      setNewCategoryColor('blue');
+                    }}
+                  >
+                    <Text style={styles.cancelModalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.createModalButton]}
+                    onPress={handleCreateCategory}
+                    disabled={!newCategoryName.trim()}
+                  >
+                    <Text style={styles.createModalButtonText}>Create</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelModalButton]}
-                  onPress={() => {
-                    setShowCategoryModal(false);
-                    setNewCategoryName('');
-                    setNewCategoryColor('blue');
-                  }}
-                >
-                  <Text style={styles.cancelModalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.createModalButton]}
-                  onPress={handleCreateCategory}
-                  disabled={!newCategoryName.trim()}
-                >
-                  <Text style={styles.createModalButtonText}>Create</Text>
-                </TouchableOpacity>
-              </View>
             </View>
-          </View>
+          </Modal>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -461,38 +574,110 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 14,
   },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pickerContainer: {
-    flex: 1,
+  // Custom Category Picker Styles
+  categoryPickerButton: {
     backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#d1d5db',
+    padding: 15,
+    minHeight: 50,
   },
-  picker: {
-    height: 50,
+  categoryPickerDisabled: {
+    opacity: 0.6,
   },
-  manualCategoryButton: {
+  categoryPickerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedCategoryContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: '#f0f9ff',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#0ea5e9',
-    borderStyle: 'dashed',
   },
-  manualCategoryButtonText: {
-    color: '#0ea5e9',
-    fontSize: 14,
+  categoryColorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  selectedCategoryText: {
+    fontSize: 16,
+    color: '#1f2937',
     fontWeight: '500',
-    marginLeft: 6,
+  },
+  categoryPickerPlaceholder: {
+    fontSize: 16,
+    color: '#9ca3af',
+  },
+  // Category Modal Styles
+  categoryModalContent: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 12,
+    maxHeight: '70%',
+    width: '90%',
+  },
+  categoryModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  categoryModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  categoryList: {
+    maxHeight: 300,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  selectedCategoryOption: {
+    backgroundColor: '#f0f9ff',
+  },
+  categoryOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  categoryOptionText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  selectedCategoryOptionText: {
+    color: '#0ea5e9',
+    fontWeight: '500',
+  },
+  addCategoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  addCategoryIcon: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#e0f2fe',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  addCategoryText: {
+    fontSize: 16,
+    color: '#0ea5e9',
+    fontWeight: '500',
   },
   tagsContainer: {
     marginBottom: 15,
@@ -558,11 +743,7 @@ const styles = StyleSheet.create({
   },
   // Modal styles
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',

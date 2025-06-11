@@ -129,6 +129,32 @@ class SupabaseRestClient {
   from(table: string) {
     return new SupabaseTable(this.supabaseUrl, this.headers, table);
   }
+  rpc(functionName: string, params: Record<string, any> = {}) {
+    return {
+      execute: async () => {
+        try {
+          const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/${functionName}`, {
+            method: 'POST',
+            headers: {
+              ...this.headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params),
+          });
+
+          const data = await response.json();
+          
+          if (!response.ok) {
+            return { data: null, error: data };
+          }
+
+          return { data, error: null };
+        } catch (error) {
+          return { data: null, error };
+        }
+      }
+    };
+  }
 }
 
 class SupabaseTable {
@@ -416,10 +442,7 @@ export const deleteNote = async (id: string) => {
 
 export const searchNotes = async (query: string) => {
   const result = await supabase
-    .from('notes')
-    .select('*')
-    .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
-    .order('created_at', { ascending: false })
+    .rpc('search_notes', { search_query: query })
     .execute();
 
   if (result.error) {

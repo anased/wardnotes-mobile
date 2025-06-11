@@ -17,6 +17,7 @@ import CreateNoteScreen from '../../screens/notes/CreateNoteScreen';
 import EditNoteScreen from '../../screens/notes/EditNoteScreen';
 import SettingsScreen from '../../screens/settings/SettingsScreen';
 import ProfileScreen from '../../screens/settings/ProfileScreen';
+import LearningTrackerScreen from '../../screens/learning-tracker/LearningTrackerScreen'; // Add this import
 
 // Import types
 import { RootStackParamList, MainTabParamList } from '../../types/navigation';
@@ -36,6 +37,8 @@ function MainTabs() {
             iconName = focused ? 'library' : 'library-outline';
           } else if (route.name === 'Create') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
+          } else if (route.name === 'LearningTracker') { // Add this condition
+            iconName = focused ? 'flash' : 'flash-outline';
           } else if (route.name === 'Settings') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
@@ -56,6 +59,11 @@ function MainTabs() {
         name="Create" 
         component={CreateNoteScreen}
         options={{ title: 'New Note' }}
+      />
+      <Tab.Screen 
+      name="LearningTracker" 
+      component={LearningTrackerScreen}
+      options={{ tabBarLabel: 'Tracker' }}
       />
       <Tab.Screen 
         name="Settings" 

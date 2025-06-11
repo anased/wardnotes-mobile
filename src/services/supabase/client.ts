@@ -685,27 +685,42 @@ export const deleteTag = async (id: string) => {
 };
 
 // Daily Activity operations
+
 export const getCurrentStreak = async (): Promise<number> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return 0;
+  }
+
   const today = new Date().toISOString().split('T')[0];
   
   const result = await supabase
     .from('daily_activity')
     .select('streak_days')
+    .eq('user_id', user.id)
     .eq('date', today)
     .single();
     
   if (result.error && result.error.code !== 'PGRST116') {
     console.error('Error fetching current streak:', result.error);
-    throw result.error;
+    return 0; // Return 0 instead of throwing to handle gracefully
   }
   
   return result.data?.streak_days || 0;
 };
 
 export const getActivityForDateRange = async (startDate: string, endDate: string): Promise<DailyActivity[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return [];
+  }
+
   const result = await supabase
     .from('daily_activity')
     .select('*')
+    .eq('user_id', user.id)
     .gte('date', startDate)
     .lte('date', endDate)
     .order('date', { ascending: true })
@@ -713,7 +728,7 @@ export const getActivityForDateRange = async (startDate: string, endDate: string
     
   if (result.error) {
     console.error('Error fetching activity for date range:', result.error);
-    throw result.error;
+    return []; // Return empty array instead of throwing
   }
   
   return result.data as DailyActivity[];

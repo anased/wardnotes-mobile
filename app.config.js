@@ -7,7 +7,7 @@ export default {
       icon: "./assets/icon.png",
       userInterfaceStyle: "automatic",
       splash: {
-        image: "./assets/splash.png",
+        image: "./assets/splash-icon.png",
         resizeMode: "contain",
         backgroundColor: "#0ea5e9"
       },
@@ -16,6 +16,8 @@ export default {
       ],
       ios: {
         supportsTablet: true,
+        bundleIdentifier: "com.wardnotes.mobile", // Add this
+        buildNumber: "1", // Add this
       },
       android: {
         adaptiveIcon: {
@@ -29,6 +31,9 @@ export default {
       extra: {
         supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
         supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+        eas: {
+          projectId: "101f4789-38fb-46d2-973c-0f51b275415c"  // Add this line
+        },
       },
       platforms: ["ios", "android"],
     }

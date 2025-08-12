@@ -24,6 +24,7 @@ import useTags from '../../hooks/useTags';
 import LoadingScreen from '../auth/LoadingScreen';
 import { getNotes } from '../../services/supabase/client';
 import { Note } from '../../services/supabase/client';
+import { hasTablesInContent } from '../../utils/tableDetection';
 
 export default function NotesListScreen() {
   const { isAuthenticated, loading: authLoading, user } = useAuthGuard();
@@ -206,39 +207,50 @@ export default function NotesListScreen() {
     return colorMap[color] || colorMap.blue;
   };
 
-  const renderNoteItem = (note: typeof notes[0]) => (
-    <TouchableOpacity
-      key={note.id}
-      style={styles.noteCard}
-      onPress={() => handleNotePress(note.id)}
-    >
-      <View style={styles.noteHeader}>
-        <Text style={styles.noteTitle} numberOfLines={2}>
-          {note.title}
-        </Text>
-        <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(note.category) }]}>
-          <Text style={styles.categoryText}>{note.category}</Text>
-        </View>
-      </View>
-      
-      <Text style={styles.noteDate}>
-        {formatDate(note.created_at)}
-      </Text>
-
-      {note.tags && note.tags.length > 0 && (
-        <View style={styles.tagsContainer}>
-          {note.tags.slice(0, 3).map((tag, index) => (
-            <Text key={index} style={styles.tag}>
-              {tag}
+  const renderNoteItem = (note: typeof notes[0]) => {
+    const isWebOnly = hasTablesInContent(note.content);
+    
+    return (
+      <TouchableOpacity
+        key={note.id}
+        style={styles.noteCard}
+        onPress={() => handleNotePress(note.id)}
+      >
+        <View style={styles.noteHeader}>
+          <View style={styles.noteTitleContainer}>
+            <Text style={styles.noteTitle} numberOfLines={2}>
+              {note.title}
             </Text>
-          ))}
-          {note.tags.length > 3 && (
-            <Text style={styles.tag}>+{note.tags.length - 3}</Text>
-          )}
+            {isWebOnly && (
+              <View style={styles.webOnlyIndicator}>
+                <Ionicons name="globe-outline" size={14} color="#f59e0b" />
+              </View>
+            )}
+          </View>
+          <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(note.category) }]}>
+            <Text style={styles.categoryText}>{note.category}</Text>
+          </View>
         </View>
-      )}
-    </TouchableOpacity>
-  );
+        
+        <Text style={styles.noteDate}>
+          {formatDate(note.created_at)}
+        </Text>
+
+        {note.tags && note.tags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {note.tags.slice(0, 3).map((tag, index) => (
+              <Text key={index} style={styles.tag}>
+                {tag}
+              </Text>
+            ))}
+            {note.tags.length > 3 && (
+              <Text style={styles.tag}>+{note.tags.length - 3}</Text>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -628,12 +640,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 8,
   },
+  noteTitleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
   noteTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
     flex: 1,
     marginRight: 8,
+  },
+  webOnlyIndicator: {
+    marginLeft: 4,
+    padding: 2,
   },
   categoryBadge: {
     paddingHorizontal: 8,

@@ -85,17 +85,17 @@ export interface TipTapNode {
       const nextTag = html.indexOf('<', currentPos);
       
       if (nextTag === -1) {
-        // No more tags, add remaining text
-        const text = html.substring(currentPos).trim();
+        // No more tags, add remaining text - preserve whitespace
+        const text = html.substring(currentPos);
         if (text) {
           elements.push({ type: 'text', text });
         }
         break;
       }
   
-      // Add text before the tag
+      // Add text before the tag - preserve whitespace
       if (nextTag > currentPos) {
-        const text = html.substring(currentPos, nextTag).trim();
+        const text = html.substring(currentPos, nextTag);
         if (text) {
           elements.push({ type: 'text', text });
         }
@@ -103,7 +103,14 @@ export interface TipTapNode {
   
       // Parse the tag
       const tagEnd = html.indexOf('>', nextTag);
-      if (tagEnd === -1) break;
+      if (tagEnd === -1) {
+        // Malformed HTML - treat the rest as text
+        const text = html.substring(currentPos).trim();
+        if (text) {
+          elements.push({ type: 'text', text });
+        }
+        break;
+      }
   
       const tagContent = html.substring(nextTag + 1, tagEnd);
       
@@ -136,8 +143,10 @@ export interface TipTapNode {
       const closingPos = html.indexOf(closingTag, tagEnd + 1);
   
       if (closingPos === -1) {
-        // No closing tag found, treat as text
-        elements.push({ type: 'text', text: html.substring(nextTag) });
+        // No closing tag found, treat the content from the current position as text
+        // This handles malformed HTML by preserving it as text content
+        const remainingText = html.substring(nextTag);
+        elements.push({ type: 'text', text: remainingText });
         break;
       }
   
@@ -184,51 +193,55 @@ export interface TipTapNode {
   
       switch (tagName) {
         case 'p':
+          // Ensure paragraph always has at least one text node
+          const paragraphContent = children.length > 0 ? children : [{ type: 'text', text: '' }];
+          // Filter out null/undefined children and ensure we have valid text nodes
+          const validContent = paragraphContent.filter(child => child && child.type === 'text');
           return {
             type: 'paragraph',
-            content: children.length > 0 ? children : [{ type: 'text', text: '' }]
+            content: validContent.length > 0 ? validContent : [{ type: 'text', text: '' }]
           };
   
         case 'h1':
           return {
             type: 'heading',
             attrs: { level: 1 },
-            content: children
+            content: children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }]
           };
   
         case 'h2':
           return {
             type: 'heading',
             attrs: { level: 2 },
-            content: children
+            content: children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }]
           };
   
         case 'h3':
           return {
             type: 'heading',
             attrs: { level: 3 },
-            content: children
+            content: children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }]
           };
   
         case 'h4':
           return {
             type: 'heading',
             attrs: { level: 4 },
-            content: children
+            content: children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }]
           };
   
         case 'h5':
           return {
             type: 'heading',
             attrs: { level: 5 },
-            content: children
+            content: children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }]
           };
   
         case 'h6':
           return {
             type: 'heading',
             attrs: { level: 6 },
-            content: children
+            content: children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }]
           };
   
         case 'ul':
@@ -247,24 +260,31 @@ export interface TipTapNode {
           // Wrap text children in paragraphs for TipTap compatibility
           const listContent = children.length > 0 ? children : [{ type: 'text', text: '' }];
           const wrappedContent = listContent.map(child => {
-            if (child.type === 'text') {
+            if (child && child.type === 'text') {
               return {
                 type: 'paragraph',
                 content: [child]
               };
             }
             return child;
-          });
+          }).filter(Boolean);
           
           return {
             type: 'listItem',
-            content: wrappedContent
+            content: wrappedContent.length > 0 ? wrappedContent : [{
+              type: 'paragraph',
+              content: [{ type: 'text', text: '' }]
+            }]
           };
   
         case 'blockquote':
+          const validBlockquoteChildren = children.filter(child => child && (child.type === 'paragraph' || child.type === 'text'));
           return {
             type: 'blockquote',
-            content: children
+            content: validBlockquoteChildren.length > 0 ? validBlockquoteChildren : [{
+              type: 'paragraph',
+              content: [{ type: 'text', text: '' }]
+            }]
           };
   
         case 'br':
@@ -287,7 +307,19 @@ export interface TipTapNode {
   
         case 'strong':
         case 'b':
-          const boldText = extractTextFromChildren(element.children || []);
+          // Preserve text nodes with proper spacing, including leading/trailing spaces
+          if (children.length === 1 && children[0]?.type === 'text') {
+            return {
+              ...children[0],
+              marks: [{ type: 'bold' }]
+            };
+          }
+          // Extract text while preserving whitespace
+          const boldText = element.children?.map(child => {
+            if (child.type === 'text') return child.text || '';
+            return '';
+          }).join('') || '';
+          
           return {
             type: 'text',
             text: boldText,
@@ -296,7 +328,19 @@ export interface TipTapNode {
   
         case 'em':
         case 'i':
-          const italicText = extractTextFromChildren(element.children || []);
+          // Preserve text nodes with proper spacing, including leading/trailing spaces
+          if (children.length === 1 && children[0]?.type === 'text') {
+            return {
+              ...children[0],
+              marks: [{ type: 'italic' }]
+            };
+          }
+          // Extract text while preserving whitespace
+          const italicText = element.children?.map(child => {
+            if (child.type === 'text') return child.text || '';
+            return '';
+          }).join('') || '';
+          
           return {
             type: 'text',
             text: italicText,
@@ -340,12 +384,164 @@ export interface TipTapNode {
         case 'div':
           // Convert div content as paragraph if it has meaningful content
           if (children.length > 0) {
+            const validChildren = children.filter(child => child && child.type === 'text');
             return {
               type: 'paragraph',
-              content: children
+              content: validChildren.length > 0 ? validChildren : [{ type: 'text', text: '' }]
             };
           }
           return null;
+
+        case 'table':
+          // Mobile TipTap editor might not support tables - convert to formatted text as fallback
+          console.log('🔄 🚨 PROCESSING TABLE ELEMENT');
+          console.log('🔄 Table element children count:', children.length);
+          console.log('🔄 Table element children details:', children.map(c => ({ 
+            type: c?.type, 
+            hasContent: !!c?.content
+          })));
+          
+          let allTableRows: TipTapNode[] = [];
+          
+          // Collect rows first - handle both direct rows and rows within sections
+          children.forEach((child, index) => {
+            console.log(`🔄 Processing table child ${index}:`, child?.type);
+            if (child && child.type === 'tableRow') {
+              console.log('🔄 ✅ Found direct table row');
+              allTableRows.push(child);
+            } else if (child && child.type === 'tableSectionPlaceholder' && child.content) {
+              console.log('🔄 ✅ Found table section placeholder with rows:', child.content.length);
+              allTableRows.push(...child.content);
+            }
+          });
+          
+          console.log('🔄 Total table rows collected:', allTableRows.length);
+          
+          if (allTableRows.length === 0) {
+            console.log('🔄 ❌ No table rows found - returning fallback');
+            return {
+              type: 'paragraph',
+              content: [{ type: 'text', text: '📊 [Empty Table]' }]
+            };
+          }
+          
+          // Convert rows to readable text format
+          const contentNodes: TipTapNode[] = [
+            { 
+              type: 'paragraph', 
+              content: [{ 
+                type: 'text', 
+                text: '📊 TABLE:', 
+                marks: [{ type: 'bold' }] 
+              }] 
+            }
+          ];
+          
+          allTableRows.forEach((row, rowIndex) => {
+            console.log(`🔄 Processing row ${rowIndex}:`, { 
+              hasContent: !!row.content,
+              cellCount: row.content?.length || 0
+            });
+            
+            if (row.content && row.content.length > 0) {
+              const cellTexts: string[] = [];
+              
+              row.content.forEach((cell: any, cellIndex: number) => {
+                console.log(`🔄 Processing cell ${cellIndex}:`, {
+                  type: cell?.type,
+                  hasContent: !!cell.content
+                });
+                
+                // Extract text from cell content
+                let cellText = '';
+                if (cell.content && Array.isArray(cell.content)) {
+                  cell.content.forEach((paragraph: any) => {
+                    if (paragraph.content && Array.isArray(paragraph.content)) {
+                      const textParts = paragraph.content
+                        .filter((textNode: any) => textNode.type === 'text')
+                        .map((textNode: any) => textNode.text || '')
+                        .join('');
+                      cellText += textParts;
+                    }
+                  });
+                }
+                
+                console.log(`🔄 Extracted cell text: "${cellText}"`);
+                if (cellText.trim()) {
+                  cellTexts.push(cellText.trim());
+                }
+              });
+              
+              if (cellTexts.length > 0) {
+                const rowText = cellTexts.join(' | ');
+                console.log(`🔄 Row ${rowIndex} text: "${rowText}"`);
+                
+                contentNodes.push({
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: rowText }]
+                });
+                
+                // Add separator line after header row
+                if (rowIndex === 0 && allTableRows.length > 1) {
+                  contentNodes.push({
+                    type: 'paragraph', 
+                    content: [{ type: 'text', text: '---' }]
+                  });
+                }
+              }
+            }
+          });
+          
+          console.log('🔄 ✅ Table converted to', contentNodes.length, 'paragraphs');
+          
+          // Always return tableAsText type for expansion
+          return { 
+            type: 'tableAsText', 
+            content: contentNodes 
+          };
+
+        case 'tbody':
+        case 'thead':
+        case 'tfoot':
+          // These are table section elements - return their row children directly
+          const sectionRows = children.filter(child => child && child.type === 'tableRow');
+          // Return rows as separate nodes rather than null, so they get added to parent content
+          return sectionRows.length > 0 ? { type: 'tableSectionPlaceholder', content: sectionRows } : null;
+
+        case 'tr':
+          console.log('🔄 Processing table row, children:', children.length);
+          const tableCells = children.filter(child => child && (child.type === 'tableCell' || child.type === 'tableHeader'));
+          console.log('🔄 Table row cells found:', tableCells.length);
+          return {
+            type: 'tableRow',
+            content: tableCells.length > 0 ? tableCells : []
+          };
+
+        case 'th':
+          // Table headers can contain rich content - process children to preserve formatting
+          console.log('🔄 Processing table header, children:', children.length);
+          const thContent = children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }];
+          console.log('🔄 Table header content nodes:', thContent.length);
+          return {
+            type: 'tableHeader',
+            content: [{
+              type: 'paragraph',
+              content: thContent.length > 0 ? thContent : [{ type: 'text', text: '' }]
+            }]
+          };
+
+        case 'td':
+          // Table cells can contain rich content - process children to preserve formatting
+          console.log('🔄 Processing table cell, children:', children.length);
+          const tdContent = children.length > 0 ? children.filter(child => child && child.type === 'text') : [{ type: 'text', text: '' }];
+          console.log('🔄 Table cell content nodes:', tdContent.length);
+          return {
+            type: 'tableCell',
+            content: [{
+              type: 'paragraph',
+              content: tdContent.length > 0 ? tdContent : [{ type: 'text', text: '' }]
+            }]
+          };
   
         default:
           // For unknown elements, try to preserve text content
@@ -364,51 +560,184 @@ export interface TipTapNode {
   };
   
   /**
+   * Preserves formatting while cleaning up problematic HTML
+   */
+  const cleanupHtmlContent = (html: string): string => {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+    
+    // Only remove obvious TipTap JSON fragments, preserve HTML formatting
+    let cleanHtml = html
+      .replace(/\{"type":"[^"]+","content":\[[^\]]*\]\}/g, '') // Remove TipTap JSON fragments
+      .trim();
+    
+    // Only decode double-encoded entities, preserve single encoding for display
+    cleanHtml = cleanHtml
+      .replace(/&amp;lt;/g, '&lt;')  // Double to single encoding
+      .replace(/&amp;gt;/g, '&gt;')
+      .replace(/&amp;amp;/g, '&amp;')
+      .replace(/&amp;quot;/g, '&quot;')
+      .replace(/&amp;#39;/g, '&#39;');
+    
+    // Only decode entities that are clearly meant to be HTML tags
+    const tagRegex = /&lt;(\/?(?:p|h[1-6]|strong|b|em|i|u|s|br|table|tbody|thead|tfoot|tr|td|th|ul|ol|li|div|span|code|pre|blockquote|a)(?:\s[^&]*?)?)&gt;/gi;
+    cleanHtml = cleanHtml.replace(tagRegex, '<$1>');
+    
+    return cleanHtml;
+  };
+
+  /**
+   * Validates content consistency before conversion
+   */
+  const validateHtmlInput = (html: string): { isValid: boolean; cleaned: string } => {
+    if (!html || typeof html !== 'string') {
+      return { isValid: false, cleaned: '' };
+    }
+
+    // Check for obvious corruption patterns
+    const hasJsonPattern = /\{\"type\":\"[^\"]+\",\"content\":\[/.test(html);
+    const hasExcessiveEntities = (html.match(/&[a-zA-Z0-9]+;/g) || []).length > html.length / 10;
+    
+    if (hasJsonPattern || hasExcessiveEntities) {
+      console.warn('Detected potentially corrupted HTML content');
+    }
+
+    return { 
+      isValid: true, 
+      cleaned: cleanupHtmlContent(html)
+    };
+  };
+
+  /**
    * Converts HTML from mobile rich text editor to TipTap JSON format
    */
   export const convertHtmlToTipTap = (html: string): TipTapDocument => {
-    console.log('Converting HTML to TipTap:', html);
+    console.log('🔄 === HTML TO TIPTAP CONVERSION ===');
+    console.log('🔄 Input HTML:', html);
+    console.log('🔄 HTML length:', html.length);
     
-    if (!html || html.trim() === '') {
+    // Validate and clean input
+    const validation = validateHtmlInput(html);
+    if (!validation.isValid || !validation.cleaned.trim()) {
+      console.warn('Invalid HTML input, returning empty document');
       return {
         type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            content: []
-          }
-        ]
+        content: [{
+          type: 'paragraph',
+          content: [{ type: 'text', text: '' }]
+        }]
       };
     }
-  
-    // Parse HTML using our custom parser
-    const parsed = parseHTML(html);
     
-    const content: TipTapNode[] = [];
+    console.log('🔄 Cleaned HTML:', validation.cleaned);
     
-    // Process each parsed element
-    for (const element of parsed) {
-      const node = convertParsedElementToTipTap(element);
-      if (node) {
-        content.push(node);
+    try {
+      // Parse HTML using our custom parser
+      const parsed = parseHTML(validation.cleaned);
+      console.log('🔄 Parsed elements count:', parsed.length);
+      console.log('🔄 Parsed elements:', parsed.map(p => ({ type: p.type, tagName: p.tagName, hasChildren: !!p.children?.length })));
+      
+      // Check specifically for table elements
+      const tableElements = parsed.filter(p => p.tagName === 'table');
+      console.log('🔄 🚨 TABLE ELEMENTS FOUND:', tableElements.length);
+      if (tableElements.length > 0) {
+        console.log('🔄 Table element details:', tableElements.map(t => ({
+          type: t.type,
+          tagName: t.tagName,
+          childrenCount: t.children?.length || 0,
+          children: t.children?.map(c => ({ type: c.type, tagName: c.tagName }))
+        })));
       }
-    }
-  
-    // Ensure we have at least one paragraph
-    if (content.length === 0) {
-      content.push({
-        type: 'paragraph',
-        content: []
+      
+      const content: TipTapNode[] = [];
+      
+      // Process each parsed element
+      for (const element of parsed) {
+        try {
+          const node = convertParsedElementToTipTap(element);
+          if (node) {
+            // Handle special tableAsText type - expand to multiple paragraphs
+            if (node.type === 'tableAsText' && node.content) {
+              console.log('🔄 🚨 EXPANDING TABLEASTEXT');
+              console.log('🔄 Expanding tableAsText to', node.content.length, 'paragraphs');
+              console.log('🔄 TableAsText content preview:', node.content.map(n => ({
+                type: n.type,
+                text: n.content?.[0]?.text?.substring(0, 50)
+              })));
+              content.push(...node.content);
+            } else {
+              content.push(node);
+            }
+          }
+        } catch (elementError) {
+          console.warn('Error processing element:', element, elementError);
+          // Continue with other elements
+        }
+      }
+    
+      // Ensure we have at least one paragraph with proper text node
+      if (content.length === 0) {
+        content.push({
+          type: 'paragraph',
+          content: [{ type: 'text', text: '' }]
+        });
+      }
+    
+      // Validate the resulting structure before returning
+      const validatedContent = content.filter(node => {
+        if (!node || !node.type) return false;
+        
+        // For complex nodes, ensure they have valid content arrays
+        if (['table', 'tableRow', 'bulletList', 'orderedList', 'blockquote'].includes(node.type)) {
+          if (!Array.isArray(node.content)) return false;
+        }
+        
+        // For leaf nodes, ensure they have text or valid content
+        if (node.type === 'text') {
+          return typeof node.text === 'string';
+        }
+        
+        return true;
       });
+
+      const result = {
+        type: 'doc' as const,
+        content: validatedContent.length > 0 ? validatedContent : [{
+          type: 'paragraph',
+          content: [{ type: 'text', text: '' }]
+        }]
+      };
+
+      console.log('🔄 === CONVERSION COMPLETED ===');
+      console.log('🔄 Final TipTap nodes count:', result.content.length);
+      console.log('🔄 Final TipTap result:', JSON.stringify(result, null, 2));
+      
+      // Final validation
+      try {
+        JSON.stringify(result);
+        return result;
+      } catch (serializationError) {
+        throw serializationError;
+      }
+      
+    } catch (error) {
+      console.error('Failed to convert HTML to TipTap:', error);
+      console.error('Problematic HTML:', html);
+      
+      // Return fallback with preserved text content
+      const textContent = html.replace(/<[^>]*>/g, '').trim();
+      return {
+        type: 'doc',
+        content: [{
+          type: 'paragraph', 
+          content: [{ 
+            type: 'text', 
+            text: textContent || 'Content conversion failed - please refresh' 
+          }]
+        }]
+      };
     }
-  
-    const result = {
-      type: 'doc' as const,
-      content
-    };
-  
-    console.log('Converted TipTap result:', JSON.stringify(result, null, 2));
-    return result;
   };
   
   /**
@@ -461,9 +790,16 @@ export interface TipTapNode {
         return '<hr>';
   
       case 'text':
-        let text = escapeHtml(node.text || '');
+        let text = node.text || '';
         
-        // Apply marks
+        // Minimal escaping - preserve spaces and formatting
+        text = text.replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;');
+        
+        // Apply marks while preserving whitespace
         if (node.marks && Array.isArray(node.marks)) {
           for (const mark of node.marks) {
             switch (mark.type) {
@@ -484,20 +820,80 @@ export interface TipTapNode {
                 break;
               case 'link':
                 const href = mark.attrs?.href || '#';
-                text = `<a href="${escapeHtml(href)}">${text}</a>`;
+                const unescapedHref = href.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                text = `<a href="${unescapedHref}">${text}</a>`;
                 break;
             }
           }
         }
         
         return text;
+
+      case 'table':
+        // Convert TipTap table to mobile-friendly text format instead of HTML
+        console.log('🔄 🚨 CONVERTING TIPTAP TABLE TO TEXT FORMAT');
+        console.log('🔄 Table rows count:', node.content?.length || 0);
+        
+        const tableRows = node.content || [];
+        if (tableRows.length === 0) {
+          return '<p>📊 [Empty Table]</p>';
+        }
+        
+        let tableHtml = '<div style="margin: 16px 0; padding: 12px; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid #0ea5e9;">';
+        tableHtml += '<p style="margin: 0 0 8px 0; font-weight: bold; color: #0ea5e9;">📊 TABLE</p>';
+        
+        tableRows.forEach((row: any, rowIndex: number) => {
+          if (row.type === 'tableRow' && row.content) {
+            const cellTexts: string[] = [];
+            
+            row.content.forEach((cell: any) => {
+              let cellContent = '';
+              if (cell.content) {
+                cellContent = cell.content.map((paragraph: any) => {
+                  if (paragraph.content) {
+                    return paragraph.content
+                      .filter((textNode: any) => textNode.type === 'text')
+                      .map((textNode: any) => textNode.text || '')
+                      .join('');
+                  }
+                  return '';
+                }).join(' ').trim();
+              }
+              
+              if (cellContent) {
+                cellTexts.push(cellContent);
+              }
+            });
+            
+            if (cellTexts.length > 0) {
+              const rowText = cellTexts.join(' | ');
+              tableHtml += `<p style="margin: 4px 0; font-family: monospace; color: #374151;">${escapeHtml(rowText)}</p>`;
+              
+              // Add separator after header
+              if (rowIndex === 0 && tableRows.length > 1) {
+                tableHtml += '<p style="margin: 4px 0; color: #9ca3af;">---</p>';
+              }
+            }
+          }
+        });
+        
+        tableHtml += '</div>';
+        console.log('🔄 ✅ Table converted to styled HTML format:', tableHtml.length, 'characters');
+        return tableHtml;
+
+      case 'tableRow':
+      case 'tableHeader':
+      case 'tableCell':
+        // These are handled by the table case above in the div-based conversion
+        return '';
   
       default:
         // For unknown node types, try to extract text content
         if (node.content) {
           return (node.content || []).map(convertTipTapNodeToHtml).join('');
         }
-        return node.text || '';
+        // Escape HTML in raw text content to prevent HTML injection
+        return escapeHtml(node.text || '');
     }
   };
   
@@ -505,10 +901,34 @@ export interface TipTapNode {
    * Converts TipTap JSON to HTML for display in mobile rich text editor
    */
   export const convertTipTapToHtml = (tipTapDoc: any): string => {
-    console.log('Converting TipTap to HTML:', tipTapDoc);
+    console.log('🔄 === TIPTAP TO HTML CONVERSION ===');
+    console.log('🔄 Input TipTap doc:', JSON.stringify(tipTapDoc, null, 2));
+    
+    // Check for table nodes specifically
+    if (tipTapDoc && tipTapDoc.content) {
+      const tableNodes = tipTapDoc.content.filter((node: any) => node.type === 'table');
+      console.log('🔄 🚨 TABLE NODES IN TIPTAP:', tableNodes.length);
+      if (tableNodes.length > 0) {
+        console.log('🔄 Table nodes details:', tableNodes.map((table: any) => ({
+          type: table.type,
+          rowCount: table.content?.length || 0,
+          rows: table.content?.map((row: any) => ({
+            type: row.type,
+            cellCount: row.content?.length || 0
+          }))
+        })));
+      }
+    }
     
     if (!tipTapDoc) {
+      console.log('No content provided, returning empty string');
       return '';
+    }
+
+    // If it's already an HTML string, return it as-is (but log a warning)
+    if (typeof tipTapDoc === 'string') {
+      console.warn('Received HTML string instead of TipTap document:', tipTapDoc);
+      return tipTapDoc;
     }
   
     // Handle different input formats
@@ -519,24 +939,101 @@ export interface TipTapNode {
       content = tipTapDoc;
     } else if (tipTapDoc.content) {
       content = tipTapDoc.content;
+    } else if (typeof tipTapDoc === 'object' && tipTapDoc.html) {
+      // Handle legacy format with html property
+      console.warn('Received legacy format with html property:', tipTapDoc);
+      return tipTapDoc.html;
     } else {
-      return '';
+      console.warn('Unknown content format, attempting to extract text:', tipTapDoc);
+      // Try to extract any text content from the object
+      const extractedText = JSON.stringify(tipTapDoc);
+      if (extractedText && extractedText !== '{}' && !extractedText.includes('"type"')) {
+        return `<p>${escapeHtml(extractedText)}</p>`;
+      }
+      return '<p></p>';
+    }
+
+    if (!Array.isArray(content)) {
+      console.warn('Content is not an array:', content);
+      return '<p></p>';
+    }
+
+    if (content.length === 0) {
+      console.log('Content array is empty');
+      return '<p></p>';
     }
   
     const html = content.map((node: TipTapNode) => convertTipTapNodeToHtml(node)).join('');
     console.log('Converted HTML result:', html);
+    
+    // If the result is empty, return a basic paragraph
+    if (!html || html.trim() === '') {
+      console.log('Conversion resulted in empty HTML, returning default paragraph');
+      return '<p></p>';
+    }
+    
     return html;
   };
   
   /**
+   * Validates and fixes TipTap document structure
+   */
+  const validateTipTapDocument = (doc: any): TipTapDocument => {
+    if (!doc || doc.type !== 'doc' || !Array.isArray(doc.content)) {
+      return {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }]
+      };
+    }
+
+    const fixedContent = doc.content.map((node: any) => {
+      if (!node || !node.type) return null;
+      
+      // Fix paragraphs with empty content arrays
+      if (node.type === 'paragraph') {
+        if (!Array.isArray(node.content) || node.content.length === 0) {
+          return {
+            type: 'paragraph',
+            content: [{ type: 'text', text: '' }]
+          };
+        }
+        // Ensure all paragraph children are valid text nodes
+        const validContent = node.content.filter((child: any) => child && child.type === 'text');
+        return {
+          ...node,
+          content: validContent.length > 0 ? validContent : [{ type: 'text', text: '' }]
+        };
+      }
+      
+      // Fix headings with empty content
+      if (node.type === 'heading') {
+        if (!Array.isArray(node.content) || node.content.length === 0) {
+          return {
+            ...node,
+            content: [{ type: 'text', text: '' }]
+          };
+        }
+      }
+      
+      return node;
+    }).filter(Boolean);
+
+    return {
+      type: 'doc',
+      content: fixedContent.length > 0 ? fixedContent : [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }]
+    };
+  };
+
+  /**
    * Handles content from various sources and converts appropriately
    */
   export const normalizeContent = (content: any): { html: string; tiptap: TipTapDocument } => {
-    // If it's already a TipTap document
+    // If it's already a TipTap document, validate and fix it
     if (content && content.type === 'doc') {
+      const validatedTipTap = validateTipTapDocument(content);
       return {
-        html: convertTipTapToHtml(content),
-        tiptap: content
+        html: convertTipTapToHtml(validatedTipTap),
+        tiptap: validatedTipTap
       };
     }
   
@@ -561,7 +1058,7 @@ export interface TipTapNode {
     // Fallback for empty content
     const emptyTipTap: TipTapDocument = {
       type: 'doc',
-      content: [{ type: 'paragraph', content: [] }]
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }]
     };
   
     return {

@@ -163,6 +163,8 @@ class SupabaseTable {
   private table: string;
   private query: string;
   private selectColumns: string;
+  private _updateData: any;
+  private _operation: string | null;
 
   constructor(url: string, headers: Record<string, string>, table: string) {
     this.url = url;
@@ -170,51 +172,53 @@ class SupabaseTable {
     this.table = table;
     this.query = '';
     this.selectColumns = '*';
+    this._updateData = null;
+    this._operation = null;
   }
 
-  select(columns = '*') {
+  select(columns = '*'): SupabaseTable {
     this.selectColumns = columns;
     return this;
   }
 
-  eq(column: string, value: any) {
+  eq(column: string, value: any): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}${column}=eq.${encodeURIComponent(value)}`;
     return this;
   }
 
-  or(conditions: string) {
+  or(conditions: string): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}or=(${conditions})`;
     return this;
   }
 
-  contains(column: string, value: any[]) {
+  contains(column: string, value: any[]): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}${column}=cs.{${value.map(v => `"${v}"`).join(',')}}`;
     return this;
   }
 
-  gte(column: string, value: any) {
+  gte(column: string, value: any): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}${column}=gte.${encodeURIComponent(value)}`;
     return this;
   }
 
-  lte(column: string, value: any) {
+  lte(column: string, value: any): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}${column}=lte.${encodeURIComponent(value)}`;
     return this;
   }
 
-  order(column: string, options: { ascending?: boolean } = {}) {
+  order(column: string, options: { ascending?: boolean } = {}): SupabaseTable {
     const separator = this.query ? '&' : '';
     const direction = options.ascending === false ? 'desc' : 'asc';
     this.query += `${separator}order=${column}.${direction}`;
     return this;
   }
 
-  limit(count: number) {
+  limit(count: number): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}limit=${count}`;
     return this;
@@ -270,23 +274,70 @@ class SupabaseTable {
     }
   }
 
-  async update(data: any) {
+  update(data: any): SupabaseTable {
+    this._updateData = data;
+    this._operation = 'update';
+    return this;
+  }
+
+  // Execute an update operation with select
+  async updateWithSelect() {
+    return this._executeUpdate();
+  }
+
+  private async _executeUpdate() {
     try {
-      const queryString = this.query ? `?${this.query}` : '';
-      const response = await fetch(`${this.url}/rest/v1/${this.table}${queryString}`, {
+      // For updates, the select columns go in the query string WITH the filters
+      let queryString = '';
+      
+      // First add the filter conditions
+      if (this.query) {
+        queryString = this.query;
+      }
+      
+      // Then add select if specified
+      if (this.selectColumns !== '*') {
+        const selectParam = `select=${this.selectColumns}`;
+        queryString = queryString ? `${queryString}&${selectParam}` : selectParam;
+      }
+      
+      // Build final URL
+      const finalQueryString = queryString ? `?${queryString}` : '';
+      const url = `${this.url}/rest/v1/${this.table}${finalQueryString}`;
+      
+      console.log('=== EXECUTING UPDATE ===');
+      console.log('Update URL:', url);
+      console.log('Update data:', JSON.stringify(this._updateData, null, 2));
+      console.log('Update data content field:', JSON.stringify(this._updateData?.content, null, 2));
+      console.log('Query string:', queryString);
+      console.log('Headers:', this.headers);
+      
+      const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.headers, 'Prefer': 'return=representation' },
-        body: JSON.stringify(data),
+        headers: { 
+          ...this.headers, 
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(this._updateData),
       });
 
       const result = await response.json();
+      console.log('Update response status:', response.status);
+      console.log('Update response headers:', response.headers);
+      console.log('Update response:', JSON.stringify(result, null, 2));
       
       if (!response.ok) {
+        console.error('Update failed with status:', response.status);
+        console.error('Error details:', result);
         return { data: null, error: result };
       }
 
+      console.log('Update successful, returning data:', result);
+      console.log('Is result an array?', Array.isArray(result));
+      console.log('Result length if array:', Array.isArray(result) ? result.length : 'N/A');
       return { data: result, error: null };
     } catch (error) {
+      console.error('Update error:', error);
       return { data: null, error };
     }
   }
@@ -351,11 +402,12 @@ export type DailyActivity = {
 
 // Note operations
 export const getNotes = async () => {
-  const result = await supabase
+  const query = supabase
     .from('notes')
     .select('*')
-    .order('created_at', { ascending: false })
-    .execute();
+    .order('created_at', { ascending: false });
+    
+  const result = await query.execute();
 
   if (result.error) {
     console.error('Error fetching notes:', result.error);
@@ -366,17 +418,24 @@ export const getNotes = async () => {
 };
 
 export const getNoteById = async (id: string) => {
-  const result = await supabase
+  console.log('=== FETCHING NOTE BY ID ===');
+  console.log('Note ID:', id);
+  
+  const query = supabase
     .from('notes')
     .select('*')
-    .eq('id', id)
-    .single();
+    .eq('id', id);
+    
+  const result = await query.single();
+
+  console.log('Fetch result:', JSON.stringify(result, null, 2));
 
   if (result.error) {
     console.error('Error fetching note by ID:', result.error);
     throw result.error;
   }
 
+  console.log('Returning note data:', JSON.stringify(result.data, null, 2));
   return result.data as Note;
 };
 
@@ -409,28 +468,54 @@ export const createNote = async (note: Omit<Note, 'id' | 'user_id' | 'created_at
 };
 
 export const updateNote = async (id: string, note: Partial<Omit<Note, 'id' | 'user_id' | 'created_at'>>) => {
-  const result = await supabase
+  console.log('=== UPDATE NOTE CALLED ===');
+  console.log('Note ID:', id);
+  console.log('Note data to update:', JSON.stringify(note, null, 2));
+  
+  const query = supabase
     .from('notes')
     .eq('id', id)
-    .update(note);  
+    .update(note)
+    .select();
+    
+  const result = await query.updateWithSelect();
+
+  console.log('Update result:', JSON.stringify(result, null, 2));
+  console.log('Update result.data type:', typeof result.data);
+  console.log('Update result.data is array:', Array.isArray(result.data));
+  console.log('Update result.data content:', result.data);
 
   if (result.error) {
     console.error('Error updating note:', result.error);
     throw result.error;
   }
 
-  if (!result.data || result.data.length === 0) {
+  // Handle both array and single object responses
+  let updatedNote;
+  if (Array.isArray(result.data)) {
+    if (result.data.length === 0) {
+      console.error('No data returned from update operation - empty array');
+      throw new Error('Failed to update note - no data returned');
+    }
+    updatedNote = result.data[0];
+  } else if (result.data) {
+    // Single object returned
+    updatedNote = result.data;
+  } else {
+    console.error('No data returned from update operation - null/undefined');
     throw new Error('Failed to update note - no data returned');
   }
 
-  return result.data[0] as Note;
+  console.log('Update successful, returning:', updatedNote);
+  return updatedNote as Note;
 };
 
 export const deleteNote = async (id: string) => {
-  const result = await supabase
+  const query = supabase
     .from('notes')
-    .eq('id', id)
-    .delete();
+    .eq('id', id);
+    
+  const result = await query.delete();
 
   if (result.error) {
     console.error('Error deleting note:', result.error);
@@ -454,12 +539,13 @@ export const searchNotes = async (query: string) => {
 };
 
 export const filterNotesByCategory = async (category: string) => {
-  const result = await supabase
+  const query = supabase
     .from('notes')
     .select('*')
     .eq('category', category)
-    .order('created_at', { ascending: false })
-    .execute();
+    .order('created_at', { ascending: false });
+    
+  const result = await query.execute();
 
   if (result.error) {
     console.error('Error filtering notes by category:', result.error);
@@ -470,12 +556,13 @@ export const filterNotesByCategory = async (category: string) => {
 };
 
 export const filterNotesByTag = async (tag: string) => {
-  const result = await supabase
+  const query = supabase
     .from('notes')
     .select('*')
     .contains('tags', [tag])
-    .order('created_at', { ascending: false })
-    .execute();
+    .order('created_at', { ascending: false });
+    
+  const result = await query.execute();
 
   if (result.error) {
     console.error('Error filtering notes by tag:', result.error);
@@ -487,11 +574,12 @@ export const filterNotesByTag = async (tag: string) => {
 
 // Category operations
 export const getCategories = async () => {
-  const result = await supabase
+  const query = supabase
     .from('categories')
     .select('*')
-    .order('name', { ascending: true })
-    .execute();
+    .order('name', { ascending: true });
+    
+  const result = await query.execute();
 
   if (result.error) {
     console.error('Error fetching categories:', result.error);
@@ -529,10 +617,13 @@ export const createCategory = async (name: string, color: string = 'blue') => {
 };
 
 export const updateCategory = async (id: string, updates: { name?: string; color?: string }) => {
-  const result = await supabase
+  const query = supabase
     .from('categories')
     .eq('id', id)
-    .update(updates);
+    .update(updates)
+    .select();
+
+  const result = await query.updateWithSelect();
 
   if (result.error) {
     console.error('Error updating category:', result.error);
@@ -548,12 +639,13 @@ export const updateCategory = async (id: string, updates: { name?: string; color
 
 export const deleteCategory = async (id: string) => {
   // First check if category is in use
-  const notesResult = await supabase
+  const notesQuery = supabase
     .from('notes')
     .select('id')
     .eq('category', id)
-    .limit(1)
-    .execute();
+    .limit(1);
+    
+  const notesResult = await notesQuery.execute();
 
   if (notesResult.error) {
     console.error('Error checking if category is in use:', notesResult.error);
@@ -565,10 +657,11 @@ export const deleteCategory = async (id: string) => {
   }
 
   // Delete the category
-  const result = await supabase
+  const query = supabase
     .from('categories')
-    .eq('id', id)
-    .delete();
+    .eq('id', id);
+    
+  const result = await query.delete();
 
   if (result.error) {
     console.error('Error deleting category:', result.error);
@@ -580,11 +673,12 @@ export const deleteCategory = async (id: string) => {
 
 // Tag operations
 export const getTags = async () => {
-  const result = await supabase
+  const query = supabase
     .from('tags')
     .select('*')
-    .order('name', { ascending: true })
-    .execute();
+    .order('name', { ascending: true });
+    
+  const result = await query.execute();
 
   if (result.error) {
     console.error('Error fetching tags:', result.error);
@@ -621,10 +715,13 @@ export const createTag = async (name: string) => {
 };
 
 export const updateTag = async (id: string, name: string) => {
-  const result = await supabase
+  const query = supabase
     .from('tags')
     .eq('id', id)
-    .update({ name });
+    .update({ name })
+    .select();
+    
+  const result = await query.updateWithSelect();
 
   if (result.error) {
     console.error('Error updating tag:', result.error);
@@ -640,11 +737,12 @@ export const updateTag = async (id: string, name: string) => {
 
 export const deleteTag = async (id: string) => {
   // First get the tag name
-  const tagResult = await supabase
+  const tagQuery = supabase
     .from('tags')
     .select('name')
-    .eq('id', id)
-    .single();
+    .eq('id', id);
+    
+  const tagResult = await tagQuery.single();
 
   if (tagResult.error) {
     console.error('Error fetching tag name:', tagResult.error);
@@ -654,12 +752,13 @@ export const deleteTag = async (id: string) => {
   const tagName = tagResult.data?.name;
 
   // Check if tag is in use
-  const notesResult = await supabase
+  const notesQuery = supabase
     .from('notes')
     .select('id')
     .contains('tags', [tagName])
-    .limit(1)
-    .execute();
+    .limit(1);
+    
+  const notesResult = await notesQuery.execute();
 
   if (notesResult.error) {
     console.error('Error checking if tag is in use:', notesResult.error);
@@ -671,10 +770,11 @@ export const deleteTag = async (id: string) => {
   }
 
   // Delete the tag
-  const result = await supabase
+  const query = supabase
     .from('tags')
-    .eq('id', id)
-    .delete();
+    .eq('id', id);
+    
+  const result = await query.delete();
 
   if (result.error) {
     console.error('Error deleting tag:', result.error);
@@ -695,12 +795,13 @@ export const getCurrentStreak = async (): Promise<number> => {
 
   const today = new Date().toISOString().split('T')[0];
   
-  const result = await supabase
+  const query = supabase
     .from('daily_activity')
     .select('streak_days')
     .eq('user_id', user.id)
-    .eq('date', today)
-    .single();
+    .eq('date', today);
+    
+  const result = await query.single();
     
   if (result.error && result.error.code !== 'PGRST116') {
     console.error('Error fetching current streak:', result.error);
@@ -717,14 +818,15 @@ export const getActivityForDateRange = async (startDate: string, endDate: string
     return [];
   }
 
-  const result = await supabase
+  const query = supabase
     .from('daily_activity')
     .select('*')
     .eq('user_id', user.id)
     .gte('date', startDate)
     .lte('date', endDate)
-    .order('date', { ascending: true })
-    .execute();
+    .order('date', { ascending: true });
+    
+  const result = await query.execute();
     
   if (result.error) {
     console.error('Error fetching activity for date range:', result.error);

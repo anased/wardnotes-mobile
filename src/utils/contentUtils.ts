@@ -1,32 +1,50 @@
 // src/utils/contentUtils.ts
-import { convertTipTapToHtml, convertHtmlToTipTap, normalizeContent, TipTapDocument } from './tiptapConverter';
 
 /**
- * Converts various content formats to HTML for display in RichTextEditor
+ * TipTap document interface
  */
-export const convertContentToHtml = (content: any): string => {
-  console.log('Converting content to HTML:', content);
-  
-  const normalized = normalizeContent(content);
-  return normalized.html;
-};
+export interface TipTapDocument {
+  type: 'doc';
+  content: Array<{
+    type: string;
+    content?: any[];
+    attrs?: Record<string, any>;
+    marks?: Array<{ type: string; attrs?: Record<string, any> }>;
+    text?: string;
+  }>;
+}
 
 /**
- * Converts HTML content to TipTap format for storage (compatible with web app)
- */
-export const convertHtmlToStorageFormat = (html: string): TipTapDocument => {
-  return convertHtmlToTipTap(html);
-};
-
-/**
- * Validates if content has meaningful text
+ * Validates if TipTap content has meaningful text
  */
 export const hasContentText = (content: any): boolean => {
-  const html = convertContentToHtml(content);
-  // Remove HTML tags and check if there's meaningful text
-  const textOnly = html.replace(/<[^>]*>/g, '').trim();
-  return textOnly.length > 0;
+  if (!content || !content.content) return false;
+  
+  // Recursively check for text nodes
+  const hasText = (nodes: any[]): boolean => {
+    for (const node of nodes) {
+      if (node.type === 'text' && node.text?.trim()) {
+        return true;
+      }
+      if (node.content && hasText(node.content)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  
+  return hasText(content.content);
 };
 
-// Re-export TipTap utilities for convenience
-export { convertTipTapToHtml, convertHtmlToTipTap, normalizeContent, type TipTapDocument } from './tiptapConverter';
+/**
+ * Creates an empty TipTap document
+ */
+export const createEmptyTipTapDocument = (): TipTapDocument => ({
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [{ type: 'text', text: '' }]
+    }
+  ]
+});

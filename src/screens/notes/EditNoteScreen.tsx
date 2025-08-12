@@ -1,5 +1,5 @@
 // src/screens/notes/EditNoteScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,9 @@ import { Ionicons } from '@expo/vector-icons';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
-import RichTextEditor from '../../components/notes/RichTextEditor';
+import TipTapEditor, { TipTapEditorRef } from '../../components/notes/TipTapEditor';
 import { CombinedNavigationProp, EditNoteRouteProp } from '../../types/navigation';
-import { convertContentToHtml, convertHtmlToStorageFormat } from '../../utils/contentUtils';
+import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
 
 // Custom Category Picker Component (same as in CreateNoteScreen)
 interface CategoryPickerProps {
@@ -162,13 +162,15 @@ export default function EditNoteScreen() {
   const { noteId } = route.params;
 
   const [note, setNote] = useState<any>(null);
+  const editorRef = useRef<TipTapEditorRef>(null);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState<any>(null);
   const [category, setCategory] = useState('');
   const [tags, setTags] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isWebOnlyNote, setIsWebOnlyNote] = useState(false);
 
   const { fetchNoteById, editNote } = useNotes();
   const { categories, addCategory } = useCategories();
@@ -191,7 +193,7 @@ export default function EditNoteScreen() {
 
   useEffect(() => {
     loadNote();
-  }, [noteId]);
+  }, [noteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadNote = async () => {
     try {
@@ -202,10 +204,29 @@ export default function EditNoteScreen() {
       setNote(noteData);
       setTitle(noteData.title);
       
-      // Convert the content to HTML for editing
-      const htmlContent = convertContentToHtml(noteData.content);
-      console.log('Converted content for editing:', htmlContent);
-      setContent(htmlContent);
+      // Check if this note contains tables
+      const containsTables = hasTablesInContent(noteData.content);
+      console.log('📝 Note contains tables:', containsTables);
+      setIsWebOnlyNote(containsTables);
+      
+      // If it's a web-only note, show warning and navigate back
+      if (containsTables) {
+        Alert.alert(
+          'Edit on Web Only',
+          getWebOnlyReason(noteData.content) + '\n\nPlease use the web version to edit this note.',
+          [
+            { 
+              text: 'OK', 
+              onPress: () => navigation.goBack()
+            }
+          ]
+        );
+        return; // Don't continue loading the edit interface
+      }
+      
+      // Use TipTap content directly - no conversion needed!
+      console.log('Loading TipTap content directly:', noteData.content);
+      setContent(noteData.content);
       
       setCategory(noteData.category);
       setTags(noteData.tags ? noteData.tags.join(', ') : '');
@@ -219,44 +240,98 @@ export default function EditNoteScreen() {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title');
-      return;
-    }
-
-    if (!category) {
-      Alert.alert('Error', 'Please select a category');
-      return;
-    }
-
-    setSaving(true);
+    console.error('🔥 HANDLE SAVE CALLED');
     try {
+      console.error('🔥 INSIDE TRY BLOCK');
+      console.log('🟢 === SAVE BUTTON PRESSED ===');
+      
+      // Force content synchronization from editor before saving
+      let finalContent = content;
+      if (editorRef.current) {
+        console.log('🔄 Forcing content update from editor...');
+        await editorRef.current.forceContentUpdate();
+        // Get the latest content directly from editor
+        const latestContent = await editorRef.current.getCurrentContent();
+        if (latestContent) {
+          finalContent = latestContent;
+          console.log('✓ Got latest content from editor:', finalContent);
+        }
+      }
+      
+      console.log('🟢 Final content to save:', finalContent);
+      console.log('🟢 Content type:', typeof finalContent);
+      
+      try {
+        console.log('🟢 Content JSON:', JSON.stringify(content, null, 2));
+      } catch (jsonError: any) {
+        console.error('🔥 JSON stringify failed:', jsonError);
+        console.log('🟢 Content (safe):', String(content));
+      }
+      
+      if (!title.trim()) {
+        console.log('Save failed: No title');
+        Alert.alert('Error', 'Please enter a title');
+        return;
+      }
+
+      if (!category) {
+        console.log('Save failed: No category');
+        Alert.alert('Error', 'Please select a category');
+        return;
+      }
+
+      console.log('Validation passed, starting save process...');
+      setSaving(true);
       const tagArray = tags
         .split(',')
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
-      console.log('Saving note with data:', {
+      // Use the final content from editor
+      const contentToSave = finalContent || {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }]
+      };
+
+      console.log('🔵 === SAVING NOTE DATA ===');
+      console.log('🔵 Title:', title.trim());
+      console.log('🔵 Raw content state:', content);
+      console.log('🔵 Raw content type:', typeof content);
+      console.log('🔵 Content to save:', contentToSave);
+      console.log('🔵 Content to save type:', typeof contentToSave);
+      console.log('🔵 Content to save JSON:', JSON.stringify(contentToSave, null, 2));
+      console.log('🔵 Category:', category);
+      console.log('🔵 Tags:', tagArray);
+      console.log('🔵 About to call editNote...');
+
+      const saveResult = await editNote(noteId, {
         title: title.trim(),
-        content: convertHtmlToStorageFormat(content),
+        content: contentToSave,
         category,
         tags: tagArray,
       });
 
-      await editNote(noteId, {
-        title: title.trim(),
-        content: convertHtmlToStorageFormat(content),
-        category,
-        tags: tagArray,
-      });
+      console.log('🟡 === SAVE COMPLETED ===');
+      console.log('🟡 Save result:', JSON.stringify(saveResult, null, 2));
 
       Alert.alert('Success', 'Note updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() }
+        { text: 'OK', onPress: () => {
+          console.log('About to navigate back...');
+          // Small delay to ensure any pending operations complete
+          setTimeout(() => {
+            navigation.goBack();
+          }, 100);
+        }}
       ]);
-    } catch (error) {
-      console.error('Error updating note:', error);
-      Alert.alert('Error', 'Failed to update note');
+    } catch (error: any) {
+      console.error('🚨 === SAVE ERROR ===');
+      console.error('🚨 Error updating note:', error);
+      console.error('🚨 Error details:', JSON.stringify(error, null, 2));
+      console.error('🚨 Error message:', error?.message);
+      console.error('🚨 Error stack:', error?.stack);
+      Alert.alert('Error', 'Failed to update note: ' + (error?.message || 'Unknown error'));
     } finally {
+      console.error('🔥 FINALLY BLOCK');
       setSaving(false);
     }
   };
@@ -274,7 +349,7 @@ export default function EditNoteScreen() {
       setNewCategoryColor('blue');
       setShowCategoryModal(false);
       Alert.alert('Success', 'Category created successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating category:', error);
       Alert.alert('Error', 'Failed to create category');
     }
@@ -347,7 +422,14 @@ export default function EditNoteScreen() {
           <Text style={styles.headerTitle}>Edit Note</Text>
           
           <TouchableOpacity
-            onPress={handleSave}
+            onPress={() => {
+              console.error('🔴 BUTTON CLICKED!');
+              console.warn('🟠 BUTTON CLICKED!');
+              console.log('⚪ BUTTON CLICKED!');
+              // Remove the alert() as it can block execution
+              // alert('Button clicked!');
+              handleSave();
+            }}
             disabled={saving}
             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           >
@@ -407,9 +489,52 @@ export default function EditNoteScreen() {
 
           <View style={styles.editorContainer}>
             <Text style={styles.label}>Content</Text>
-            <RichTextEditor
+            <TipTapEditor
+              key={noteId} // Use noteId as key to prevent unnecessary remounts
               initialContent={content}
-              onContentChange={setContent}
+              ref={editorRef}
+              onContentChange={(newContent) => {
+                console.log('=== CONTENT CHANGE CALLBACK ===');
+                console.log('New content received:', newContent);
+                console.log('New content type:', typeof newContent);
+                
+                // Handle content updates synchronously to ensure state consistency
+                if (typeof newContent === 'string') {
+                  console.log('Received HTML content, converting to TipTap...');
+                  try {
+                    const { convertHtmlToTipTap } = require('../../utils/tiptapConverter');
+                    const tipTapContent = convertHtmlToTipTap(newContent);
+                    console.log('Converted to TipTap:', JSON.stringify(tipTapContent, null, 2));
+                    setContent(tipTapContent);
+                  } catch (error: any) {
+                    console.error('Error converting HTML to TipTap:', error);
+                    // Fallback: create a simple TipTap structure with the HTML content
+                    const fallbackContent = {
+                      type: 'doc',
+                      content: [{
+                        type: 'paragraph',
+                        content: [{ type: 'text', text: newContent.replace(/<[^>]*>/g, '') }]
+                      }]
+                    };
+                    console.log('Using fallback content:', JSON.stringify(fallbackContent, null, 2));
+                    setContent(fallbackContent);
+                  }
+                } else if (newContent && typeof newContent === 'object') {
+                  console.log('Received TipTap content directly');
+                  setContent(newContent);
+                } else {
+                  console.log('Received invalid content, using fallback');
+                  const fallbackContent = {
+                    type: 'doc',
+                    content: [{
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: String(newContent || '') }]
+                    }]
+                  };
+                  setContent(fallbackContent);
+                }
+                console.log('✓ Content state updated successfully');
+              }}
               editable={true}
             />
           </View>
@@ -757,7 +882,6 @@ const styles = StyleSheet.create({
   colorRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
   },
   colorOption: {
     width: 32,
@@ -765,19 +889,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: 'transparent',
+    marginRight: 8,
+    marginBottom: 8,
   },
   selectedColor: {
     borderColor: '#1f2937',
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 8,
   },
   modalButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   cancelModalButton: {
     backgroundColor: '#f3f4f6',

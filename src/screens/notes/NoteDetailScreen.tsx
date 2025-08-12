@@ -1,5 +1,5 @@
 // src/screens/notes/NoteDetailScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
-import RichTextEditor from '../../components/notes/RichTextEditor';
+import TipTapEditor from '../../components/notes/TipTapEditor';
 import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
 import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
-import { convertContentToHtml } from '../../utils/contentUtils';
+import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
 
 // Helper function to convert content to HTML
 const getContentAsHtml = (content: any): string => {
@@ -160,19 +160,33 @@ export default function NoteDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [isWebOnlyNote, setIsWebOnlyNote] = useState(false);
 
   const { fetchNoteById, removeNote } = useNotes();
   const { categories } = useCategories();
 
-  useEffect(() => {
-    loadNote();
-  }, [noteId]);
+  useFocusEffect(
+    useCallback(() => {
+      loadNote();
+    }, [noteId])
+  );
 
   const loadNote = async () => {
     try {
       setLoading(true);
       const noteData = await fetchNoteById(noteId);
-      console.log('Loaded note data:', noteData);
+      console.log('👁️ === LOADING NOTE FOR DISPLAY ===');
+      console.log('👁️ Note ID:', noteId);
+      console.log('👁️ Loaded note data:', JSON.stringify(noteData, null, 2));
+      console.log('👁️ Note content field:', noteData.content);
+      console.log('👁️ Content type:', typeof noteData.content);
+      console.log('👁️ Content is truthy?', !!noteData.content);
+      
+      // Check if this note contains tables
+      const containsTables = hasTablesInContent(noteData.content);
+      console.log('👁️ Note contains tables:', containsTables);
+      setIsWebOnlyNote(containsTables);
+      
       setNote(noteData);
       setError(null);
     } catch (err: any) {
@@ -184,7 +198,17 @@ export default function NoteDetailScreen() {
   };
 
   const handleEdit = () => {
-    navigation.navigate('EditNote', { noteId });
+    if (isWebOnlyNote) {
+      Alert.alert(
+        'Edit on Web Only',
+        getWebOnlyReason(note?.content) + '\n\nPlease use the web version to edit this note.',
+        [
+          { text: 'OK', style: 'default' }
+        ]
+      );
+    } else {
+      navigation.navigate('EditNote', { noteId });
+    }
   };
 
   const handleDelete = () => {
@@ -302,9 +326,8 @@ export default function NoteDetailScreen() {
     );
   }
 
-  // Get the HTML content for display
-  const htmlContent = convertContentToHtml(note.content);
-  console.log('Converted HTML content:', htmlContent);
+  // Use TipTap content directly for display
+  console.log('TipTap content:', note.content);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -327,7 +350,11 @@ export default function NoteDetailScreen() {
           </PremiumFeatureGate>
           
           <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
-            <Ionicons name="create-outline" size={20} color="#0ea5e9" />
+            <Ionicons 
+              name={isWebOnlyNote ? "globe-outline" : "create-outline"} 
+              size={20} 
+              color={isWebOnlyNote ? "#f59e0b" : "#0ea5e9"} 
+            />
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -352,11 +379,19 @@ export default function NoteDetailScreen() {
             <Text style={styles.date}>
               {formatDate(note.created_at)}
             </Text>
-            <View style={[
-              styles.categoryBadge, 
-              { backgroundColor: getCategoryBadgeColor(note.category) }
-            ]}>
-              <Text style={styles.categoryText}>{note.category}</Text>
+            <View style={styles.badgeContainer}>
+              {isWebOnlyNote && (
+                <View style={styles.webOnlyBadge}>
+                  <Ionicons name="globe-outline" size={12} color="#f59e0b" />
+                  <Text style={styles.webOnlyText}>Web Only</Text>
+                </View>
+              )}
+              <View style={[
+                styles.categoryBadge, 
+                { backgroundColor: getCategoryBadgeColor(note.category) }
+              ]}>
+                <Text style={styles.categoryText}>{note.category}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -376,10 +411,10 @@ export default function NoteDetailScreen() {
 
         <View style={styles.contentContainer}>
           <Text style={styles.contentLabel}>Content:</Text>
-          {htmlContent ? (
+          {note.content ? (
             <View style={styles.editorContainer}>
-              <RichTextEditor
-                initialContent={htmlContent}
+              <TipTapEditor
+                initialContent={note.content}
                 onContentChange={() => {}}
                 editable={false}
               />
@@ -452,6 +487,25 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  webOnlyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#fef3c7',
+    gap: 4,
+  },
+  webOnlyText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#d97706',
   },
   categoryBadge: {
     paddingHorizontal: 12,

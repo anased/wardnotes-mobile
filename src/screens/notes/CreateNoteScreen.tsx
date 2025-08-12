@@ -1,5 +1,5 @@
 // src/screens/notes/CreateNoteScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,8 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
-import { convertHtmlToStorageFormat } from '../../utils/contentUtils';
-import RichTextEditor from '../../components/notes/RichTextEditor';
+import TipTapEditor, { TipTapEditorRef } from '../../components/notes/TipTapEditor';
 
 // Custom Category Picker Component
 interface CategoryPickerProps {
@@ -156,7 +155,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
 
 export default function CreateNoteScreen() {
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState<any>(null);
+  const editorRef = useRef<TipTapEditorRef>(null);
   const [category, setCategory] = useState('');
   const [tags, setTags] = useState('');
   const [loading, setLoading] = useState(false);
@@ -235,16 +235,37 @@ export default function CreateNoteScreen() {
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
-      console.log('Creating note with data:', {
-        title: title.trim(),
-        content: convertHtmlToStorageFormat(content),
-        category,
-        tags: tagArray,
-      });
+      // Force content synchronization from editor before saving (similar to EditNoteScreen)
+      let finalContent = content;
+      if (editorRef.current) {
+        console.log('📝 Forcing content update from editor...');
+        await editorRef.current.forceContentUpdate();
+        // Get the latest content directly from editor
+        const latestContent = await editorRef.current.getCurrentContent();
+        if (latestContent) {
+          finalContent = latestContent;
+          console.log('📝 ✓ Got latest content from editor:', latestContent);
+        }
+      }
+
+      // Use TipTap content directly - no conversion needed!
+      const contentToSave = finalContent || {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }]
+      };
+
+      console.log('📝 === CREATING NEW NOTE ===');
+      console.log('📝 Title:', title.trim());
+      console.log('📝 Content state:', content);
+      console.log('📝 Final content:', finalContent);
+      console.log('📝 Content to save:', contentToSave);
+      console.log('📝 Content to save JSON:', JSON.stringify(contentToSave, null, 2));
+      console.log('📝 Category:', category);
+      console.log('📝 Tags:', tagArray);
 
       await addNote({
         title: title.trim(),
-        content: convertHtmlToStorageFormat(content),
+        content: contentToSave,
         category,
         tags: tagArray,
       });
@@ -281,21 +302,58 @@ export default function CreateNoteScreen() {
   };
 
   const insertTemplate = (templateType: string) => {
-    let template = '';
+    let tipTapContent: any;
     
     switch (templateType) {
       case 'soap':
-        template = '<h2>Subjective</h2><p></p><h2>Objective</h2><p></p><h2>Assessment</h2><p></p><h2>Plan</h2><p></p>';
+        tipTapContent = {
+          type: 'doc',
+          content: [
+            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Subjective' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Objective' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Assessment' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Plan' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: '' }] }
+          ]
+        };
         break;
       case 'physical':
-        template = '<h2>Physical Examination</h2><p><strong>Vitals:</strong></p><p><strong>General:</strong></p><p><strong>HEENT:</strong></p><p><strong>Cardiovascular:</strong></p><p><strong>Respiratory:</strong></p><p><strong>Abdominal:</strong></p><p><strong>Extremities:</strong></p><p><strong>Neurological:</strong></p>';
+        tipTapContent = {
+          type: 'doc',
+          content: [
+            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Physical Examination' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Vitals:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'General:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'HEENT:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Cardiovascular:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Respiratory:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Abdominal:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Extremities:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Neurological:', marks: [{ type: 'bold' }] }] }
+          ]
+        };
         break;
       case 'procedure':
-        template = '<h2>Procedure Note</h2><p><strong>Indication:</strong></p><p><strong>Procedure:</strong></p><p><strong>Technique:</strong></p><p><strong>Findings:</strong></p><p><strong>Complications:</strong></p><p><strong>Post-procedure care:</strong></p>';
+        tipTapContent = {
+          type: 'doc',
+          content: [
+            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Procedure Note' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Indication:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Procedure:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Technique:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Findings:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Complications:', marks: [{ type: 'bold' }] }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Post-procedure care:', marks: [{ type: 'bold' }] }] }
+          ]
+        };
         break;
     }
     
-    setContent(template);
+    console.log('📝 Inserting template:', templateType, tipTapContent);
+    setContent(tipTapContent);
   };
 
   const getTagSuggestions = () => {
@@ -426,9 +484,15 @@ export default function CreateNoteScreen() {
 
           <View style={styles.editorContainer}>
             <Text style={styles.label}>Content</Text>
-            <RichTextEditor
+            <TipTapEditor
               initialContent={content}
-              onContentChange={setContent}
+              ref={editorRef}
+              onContentChange={(newContent) => {
+                console.log('📝 NEW CONTENT CHANGE IN CREATE:', newContent);
+                console.log('📝 Content type:', typeof newContent);
+                console.log('📝 Content JSON:', JSON.stringify(newContent, null, 2));
+                setContent(newContent);
+              }}
               editable={true}
             />
           </View>

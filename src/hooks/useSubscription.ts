@@ -16,11 +16,12 @@ export function useSubscription() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data, error } = await supabase
+      const query = supabase
         .from('subscriptions')
         .select('*')
-        .eq('user_id', session.user.id)
-        .single();
+        .eq('user_id', session.user.id);
+        
+      const { data, error } = await query.single();
 
       if (data) {
         setSubscription(data);

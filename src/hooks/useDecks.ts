@@ -159,7 +159,8 @@ export const useDecksWithStats = () => {
       console.log('useDecksWithStats: Starting to load decks...');
       
       const decks = await FlashcardService.getDecks();
-      console.log('useDecksWithStats: Loaded decks:', decks);
+      console.log('useDecksWithStats: Loaded decks count:', decks.length);
+      console.log('useDecksWithStats: Loaded decks data:', JSON.stringify(decks, null, 2));
       
       // Load stats for each deck
       const decksWithStatsPromises = decks.map(async (deck) => {

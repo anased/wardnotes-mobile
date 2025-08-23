@@ -41,7 +41,8 @@ export class FlashcardService {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     
-    console.log('FlashcardService.getDecks - Response:', { data, error });
+    console.log('FlashcardService.getDecks - Response data:', JSON.stringify(data, null, 2));
+    console.log('FlashcardService.getDecks - Response error:', error);
     if (error) throw error;
     return data || [];
   }

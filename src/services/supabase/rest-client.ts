@@ -126,6 +126,11 @@ class SupabaseTable {
     this.query = '';
   }
 
+  // Make the class itself awaitable
+  then(resolve: Function, reject?: Function) {
+    return this.execute().then(resolve, reject);
+  }
+
   private async getHeaders(): Promise<Record<string, string>> {
     try {
       const session = await AsyncStorage.getItem('supabase.auth.token');
@@ -205,11 +210,19 @@ class SupabaseTable {
 
   async single() {
     const result = await this.execute();
+    console.log('REST Client - single() result:', result);
     if (result.error) return result;
     if (!result.data || result.data.length === 0) {
       return { data: null, error: { message: 'No rows found' } };
     }
     return { data: result.data[0], error: null };
+  }
+
+  // Method to get array results (used by getDecks, getFlashcards, etc.)
+  async getArray() {
+    const result = await this.execute();
+    console.log('REST Client - getArray() result:', result);
+    return result;
   }
 
   async insert(data: any) {
@@ -288,7 +301,10 @@ class SupabaseTable {
       });
 
       const data = await response.json();
-      console.log('REST Client - Response:', { status: response.status, data });
+      console.log('REST Client - Response status:', response.status);
+      console.log('REST Client - Response data type:', typeof data);
+      console.log('REST Client - Response data length:', Array.isArray(data) ? data.length : 'not array');
+      console.log('REST Client - Response data:', JSON.stringify(data, null, 2));
       
       if (!response.ok) {
         console.error('REST Client - Error response:', data);

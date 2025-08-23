@@ -251,19 +251,26 @@ class SupabaseTable {
   private async execute() {
     try {
       const queryString = this.query ? `?${this.query}` : '';
-      const response = await fetch(`${this.url}/rest/v1/${this.table}${queryString}`, {
+      const url = `${this.url}/rest/v1/${this.table}${queryString}`;
+      console.log('REST Client - Executing query:', url);
+      console.log('REST Client - Headers:', this.headers);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: this.headers,
       });
 
       const data = await response.json();
+      console.log('REST Client - Response:', { status: response.status, data });
       
       if (!response.ok) {
+        console.error('REST Client - Error response:', data);
         return { data: null, error: data };
       }
 
       return { data, error: null };
     } catch (error) {
+      console.error('REST Client - Network error:', error);
       return { data: null, error };
     }
   }

@@ -156,8 +156,10 @@ export const useDecksWithStats = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('useDecksWithStats: Starting to load decks...');
       
       const decks = await FlashcardService.getDecks();
+      console.log('useDecksWithStats: Loaded decks:', decks);
       
       // Load stats for each deck
       const decksWithStatsPromises = decks.map(async (deck) => {
@@ -166,8 +168,10 @@ export const useDecksWithStats = () => {
       });
       
       const data = await Promise.all(decksWithStatsPromises);
+      console.log('useDecksWithStats: Final data with stats:', data);
       setDecksWithStats(data);
     } catch (err) {
+      console.error('useDecksWithStats: Error loading decks:', err);
       setError(err instanceof Error ? err.message : 'Failed to load decks with stats');
     } finally {
       setLoading(false);

@@ -19,7 +19,9 @@ export class FlashcardService {
   // Helper method to get authenticated user
   private static async getAuthenticatedUser() {
     const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('FlashcardService.getAuthenticatedUser - Auth result:', { user: user?.id, error });
     if (error || !user) {
+      console.error('FlashcardService.getAuthenticatedUser - Authentication failed:', error);
       throw new Error('User must be authenticated');
     }
     return user;
@@ -31,6 +33,7 @@ export class FlashcardService {
   
   static async getDecks(): Promise<FlashcardDeck[]> {
     const user = await this.getAuthenticatedUser();
+    console.log('FlashcardService.getDecks - User ID:', user.id);
     
     const { data, error } = await supabase
       .from('flashcard_decks')
@@ -38,6 +41,7 @@ export class FlashcardService {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     
+    console.log('FlashcardService.getDecks - Response:', { data, error });
     if (error) throw error;
     return data || [];
   }

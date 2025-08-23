@@ -9,7 +9,9 @@ import {
   RefreshControl,
   Alert,
   TextInput,
-  Modal
+  Modal,
+  SafeAreaView,
+  StatusBar
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDecksWithStats } from '../../hooks/useDecks';
@@ -115,17 +117,21 @@ export default function FlashcardDashboard() {
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Error: {error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error: {error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
       <ScrollView
         style={styles.scrollView}
         refreshControl={
@@ -249,7 +255,7 @@ export default function FlashcardDashboard() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -407,18 +413,23 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   errorText: {
     color: '#ef4444',
     fontSize: 16,
     textAlign: 'center',
-    margin: 20,
+    marginBottom: 16,
   },
   retryButton: {
     backgroundColor: '#3b82f6',
     padding: 12,
     borderRadius: 6,
     alignSelf: 'center',
-    marginTop: 10,
   },
   retryButtonText: {
     color: '#ffffff',

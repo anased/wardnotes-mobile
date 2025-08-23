@@ -118,12 +118,18 @@ class SupabaseTable {
   private key: string;
   private table: string;
   private query: string;
+  private operation: string;
+  private insertData: any;
+  private updateData: any;
 
   constructor(url: string, key: string, table: string) {
     this.url = url;
     this.key = key;
     this.table = table;
     this.query = '';
+    this.operation = 'select';
+    this.insertData = null;
+    this.updateData = null;
   }
 
   // Make the class itself awaitable
@@ -225,79 +231,62 @@ class SupabaseTable {
     return result;
   }
 
-  async insert(data: any) {
-    try {
-      const headers = await this.getHeaders();
-      const response = await fetch(`${this.url}/rest/v1/${this.table}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        return { data: null, error: result };
-      }
-
-      return { data: result, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
+  insert(data: any) {
+    this.insertData = data;
+    this.operation = 'insert';
+    return this;
   }
 
-  async update(data: any) {
-    try {
-      const headers = await this.getHeaders();
-      const response = await fetch(`${this.url}/rest/v1/${this.table}?${this.query}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        return { data: null, error: result };
-      }
-
-      return { data: result, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
+  update(data: any) {
+    this.updateData = data;
+    this.operation = 'update';
+    return this;
   }
 
-  async delete() {
-    try {
-      const headers = await this.getHeaders();
-      const response = await fetch(`${this.url}/rest/v1/${this.table}?${this.query}`, {
-        method: 'DELETE',
-        headers,
-      });
-
-      if (!response.ok) {
-        const result = await response.json();
-        return { data: null, error: result };
-      }
-
-      return { data: null, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
+  delete() {
+    this.operation = 'delete';
+    return this;
   }
 
   private async execute() {
     try {
-      const queryString = this.query ? `?${this.query}` : '';
-      const url = `${this.url}/rest/v1/${this.table}${queryString}`;
       const headers = await this.getHeaders();
+      let url: string;
+      let method: string;
+      let body: string | undefined;
+
+      switch (this.operation) {
+        case 'insert':
+          url = `${this.url}/rest/v1/${this.table}`;
+          method = 'POST';
+          body = JSON.stringify(this.insertData);
+          break;
+        case 'update':
+          const updateQuery = this.query ? `?${this.query}` : '';
+          url = `${this.url}/rest/v1/${this.table}${updateQuery}`;
+          method = 'PATCH';
+          body = JSON.stringify(this.updateData);
+          break;
+        case 'delete':
+          const deleteQuery = this.query ? `?${this.query}` : '';
+          url = `${this.url}/rest/v1/${this.table}${deleteQuery}`;
+          method = 'DELETE';
+          break;
+        default: // select
+          const selectQuery = this.query ? `?${this.query}` : '';
+          url = `${this.url}/rest/v1/${this.table}${selectQuery}`;
+          method = 'GET';
+          break;
+      }
       
-      console.log('REST Client - Executing query:', url);
+      console.log('REST Client - Executing:', { operation: this.operation, method, url });
       console.log('REST Client - Headers:', headers);
+      if (body) console.log('REST Client - Body:', body);
       
       const response = await fetch(url, {
-        method: 'GET',
+        method,
         headers,
+        body,
       });
 
       const data = await response.json();

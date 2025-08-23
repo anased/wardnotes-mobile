@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { RichText, useEditorBridge } from '@10play/tentap-editor';
 import { convertTipTapToHtml, convertHtmlToTipTap } from '../../utils/tiptapConverter';
+import EditorKeyboardToolbar from './EditorKeyboardToolbar';
 
 interface TipTapEditorProps {
   initialContent?: any;
   onContentChange: (content: any) => void;
   editable?: boolean;
   placeholder?: string;
+  showToolbar?: boolean;
 }
 
 export interface TipTapEditorRef {
@@ -20,8 +22,9 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
   onContentChange,
   editable = true,
   placeholder = 'Start writing your medical note...',
+  showToolbar = true,
 }, ref) => {
-  const contentUpdateRef = useRef<NodeJS.Timeout | null>(null);
+  const contentUpdateRef = useRef<number | null>(null);
   const lastContentRef = useRef<string>('');
 
   // Function to manually check and update content
@@ -230,6 +233,9 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
         editor={editor}
         style={[styles.editor, !editable && styles.readOnlyEditor]}
       />
+      {showToolbar && editable && (
+        <EditorKeyboardToolbar editor={editor} />
+      )}
     </View>
   );
 });

@@ -150,6 +150,37 @@ class SupabaseTable {
     return this;
   }
 
+  lte(column: string, value: any) {
+    const separator = this.query ? '&' : '';
+    this.query += `${separator}${column}=lte.${value}`;
+    return this;
+  }
+
+  gte(column: string, value: any) {
+    const separator = this.query ? '&' : '';
+    this.query += `${separator}${column}=gte.${value}`;
+    return this;
+  }
+
+  neq(column: string, value: any) {
+    const separator = this.query ? '&' : '';
+    this.query += `${separator}${column}=neq.${value}`;
+    return this;
+  }
+
+  in(column: string, values: any[]) {
+    const separator = this.query ? '&' : '';
+    const valueList = values.map(v => encodeURIComponent(v)).join(',');
+    this.query += `${separator}${column}=in.(${valueList})`;
+    return this;
+  }
+
+  or(conditions: string) {
+    const separator = this.query ? '&' : '';
+    this.query += `${separator}or=(${conditions})`;
+    return this;
+  }
+
   async single() {
     const result = await this.execute();
     if (result.error) return result;

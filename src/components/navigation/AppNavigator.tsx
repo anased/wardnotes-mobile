@@ -20,6 +20,12 @@ import ProfileScreen from '../../screens/settings/ProfileScreen';
 import LearningTrackerScreen from '../../screens/learning-tracker/LearningTrackerScreen'; // Add this import
 import NotificationSettingsScreen from '../../screens/settings/NotificationSettingsScreen';
 
+// Flashcard screens
+import FlashcardDashboard from '../../screens/flashcards/FlashcardDashboard';
+import StudyScreen from '../../screens/flashcards/StudyScreen';
+import DeckScreen from '../../screens/flashcards/DeckScreen';
+import CreateCardScreen from '../../screens/flashcards/CreateCardScreen';
+
 // Import types
 import { RootStackParamList, MainTabParamList } from '../../types/navigation';
 
@@ -40,6 +46,8 @@ function MainTabs() {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
           } else if (route.name === 'LearningTracker') { // Add this condition
             iconName = focused ? 'flash' : 'flash-outline';
+          } else if (route.name === 'Flashcards') {
+            iconName = focused ? 'layers' : 'layers-outline';
           } else if (route.name === 'Settings') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
@@ -65,6 +73,10 @@ function MainTabs() {
       name="LearningTracker" 
       component={LearningTrackerScreen}
       options={{ tabBarLabel: 'Tracker' }}
+      />
+      <Tab.Screen 
+        name="Flashcards" 
+        component={FlashcardDashboard}
       />
       <Tab.Screen 
         name="Settings" 
@@ -107,6 +119,21 @@ function AuthenticatedNavigator() {
       <Stack.Screen 
         name="NotificationSettings" 
         component={NotificationSettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="StudyScreen" 
+        component={StudyScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="DeckScreen" 
+        component={DeckScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="CreateCard" 
+        component={CreateCardScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

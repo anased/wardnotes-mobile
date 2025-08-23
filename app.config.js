@@ -35,6 +35,6 @@ export default {
           projectId: "101f4789-38fb-46d2-973c-0f51b275415c"  // Add this line
         },
       },
-      platforms: ["ios", "android"],
+      platforms: ["ios", "android", "web"],
     }
   };

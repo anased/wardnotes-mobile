@@ -12,6 +12,10 @@ export type RootStackParamList = {
   Auth: undefined;
   Loading: undefined;
   NotificationSettings: undefined;
+  // Flashcard screens
+  DeckScreen: { deckId: string };
+  StudyScreen: { deckId: string; mode?: 'new' | 'review' | 'mixed' };
+  CreateCard: { deckId?: string };
 };
 
 export type MainTabParamList = {
@@ -19,6 +23,7 @@ export type MainTabParamList = {
   Create: undefined;
   Settings: undefined;
   LearningTracker: undefined;
+  Flashcards: undefined;
 };
 
 // Navigation prop types for screens
@@ -32,6 +37,9 @@ export type MainTabNavigationProp = CompositeNavigationProp<
 // Route prop types
 export type NoteDetailRouteProp = RouteProp<RootStackParamList, 'NoteDetail'>;
 export type EditNoteRouteProp = RouteProp<RootStackParamList, 'EditNote'>;
+export type DeckScreenRouteProp = RouteProp<RootStackParamList, 'DeckScreen'>;
+export type StudyScreenRouteProp = RouteProp<RootStackParamList, 'StudyScreen'>;
+export type CreateCardRouteProp = RouteProp<RootStackParamList, 'CreateCard'>;
 
 // Combined navigation prop for screens that need both
 export type CombinedNavigationProp = CompositeNavigationProp<

@@ -288,3 +288,79 @@ If you encounter "Unable to boot the Simulator" errors with launchd_sim failures
 - Use web version temporarily: `npm run web`
 
 This procedure has successfully resolved iOS Simulator issues in the past.
+
+## Recent Changes & Updates
+
+This section tracks major feature additions, architectural changes, and important fixes to help future Claude instances understand the project evolution.
+
+### Flashcard System Implementation (August 2024)
+**What Changed:**
+- Complete mobile flashcard system implementation with spaced repetition (SM-2 algorithm)
+- Cross-platform compatibility with existing web app flashcard data
+- Full study workflow with mobile-optimized UI components
+
+**Technical Details:**
+**Phase 1 - Core Infrastructure:**
+- **Types**: Created comprehensive TypeScript interfaces in `src/types/flashcard.ts` for mobile flashcard system
+- **REST Client Extensions**: Extended `src/services/supabase/rest-client.ts` with additional query methods (lte, gte, neq, in, or)
+- **Authentication Fix**: Implemented dynamic token fetching to resolve authentication issues with flashcard data loading
+- **Custom Hooks**: Built `src/hooks/useDecks.ts`, `src/hooks/useFlashcards.ts`, and `src/hooks/useStudySession.ts` for state management
+- **Navigation**: Updated `src/types/navigation.ts` to include flashcard screens (DeckScreen, StudyScreen, CreateCard)
+
+**Phase 2 - Screen Implementation:**
+- **FlashcardDashboard**: Main dashboard screen (`src/screens/flashcards/FlashcardDashboard.tsx`) with deck overview and statistics
+- **DeckScreen**: Deck management screen (`src/screens/flashcards/DeckScreen.tsx`) for individual deck operations
+- **StudyScreen**: Complete study interface (`src/screens/flashcards/StudyScreen.tsx`) with progress tracking and session management
+- **CreateCardScreen**: Card creation interface (`src/screens/flashcards/CreateCardScreen.tsx`)
+
+**Phase 3 - Study Components:**
+- **FlashcardView**: Mobile-optimized card display component (`src/components/flashcards/FlashcardView.tsx`) supporting front/back and cloze deletion
+- **Review Interface**: Touch-friendly 4-point rating system for spaced repetition reviews
+- **Study Session Management**: Complete session tracking with statistics and completion flow
+
+**Service Layer:**
+- **FlashcardService**: Full service implementation (`src/services/flashcardService.ts`) with SM-2 spaced repetition algorithm
+- **CRUD Operations**: Complete deck and flashcard management functionality
+- **Statistics**: Real-time deck statistics calculation and study session tracking
+
+**Files Added/Modified:**
+- `src/types/flashcard.ts` - Complete mobile flashcard type definitions
+- `src/services/supabase/rest-client.ts` - Extended with flashcard query methods and authentication fixes
+- `src/services/flashcardService.ts` - Complete flashcard service with SM-2 algorithm
+- `src/hooks/useDecks.ts`, `src/hooks/useFlashcards.ts`, `src/hooks/useStudySession.ts` - Custom React hooks
+- `src/screens/flashcards/` - All flashcard screen components
+- `src/components/flashcards/FlashcardView.tsx` - Core flashcard display component
+- `src/types/navigation.ts` - Extended navigation types
+- `src/screens/main/MainTabs.tsx` - Added flashcard tab
+
+**Bug Fixes During Implementation:**
+1. **UI Layout Issue**: Content overlapping status bar - fixed with SafeAreaView and StatusBar components
+2. **Authentication Issue**: Static headers not updating after login - resolved with dynamic token fetching in REST client
+3. **Query Chaining Issue**: REST client methods not returning 'this' - fixed by restructuring query builder pattern to support method chaining for insert/update/delete operations
+
+**Testing Results:**
+- Successfully tested flashcard creation, study sessions, and review submissions
+- Confirmed cross-platform data compatibility between mobile and web versions
+- Verified spaced repetition algorithm functioning correctly with proper interval calculations
+
+**Development Workflow:**
+- Developed on feature branch `feature/mobile-flashcards`
+- Systematic testing and bug resolution through iOS Simulator
+- Successfully merged to main branch after complete testing
+
+**Impact:**
+- Mobile app now has full feature parity with web app for flashcard functionality
+- Users can seamlessly study flashcards across mobile and web platforms
+- Implements proven spaced repetition algorithm for effective learning
+- Maintains consistent data model and user experience across platforms
+
+### Future Update Guidelines
+When adding new features or making significant changes:
+
+1. **Document in this section** with date and brief description
+2. **Include technical details** that affect architecture or major components  
+3. **List modified files** for easy reference
+4. **Note any breaking changes** or migration requirements
+5. **Update relevant sections above** if core architecture changes
+
+This helps maintain continuity across different Claude Code sessions and provides context for debugging or further development.

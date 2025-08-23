@@ -439,6 +439,8 @@ export default function NotesListScreen() {
       </Modal>
       <ScrollView 
         style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -619,6 +621,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 100, // Account for absolute positioned tab bar
   },
   notesContainer: {
     padding: 16,

@@ -402,7 +402,12 @@ export default function CreateNoteScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView 
+          style={styles.content} 
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <TextInput
             style={styles.titleInput}
             placeholder="Enter note title..."
@@ -605,7 +610,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
     padding: 15,
+    paddingBottom: 20,
   },
   titleInput: {
     fontSize: 20,

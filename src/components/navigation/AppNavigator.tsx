@@ -57,6 +57,18 @@ function MainTabs() {
         tabBarActiveTintColor: '#0ea5e9',
         tabBarInactiveTintColor: 'gray',
         headerShown: false,
+        tabBarHideOnKeyboard: true,
+        tabBarStyle: {
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#e5e7eb',
+          paddingBottom: 0,
+          height: 84, // Standard tab bar height including safe area
+        },
       })}
     >
       <Tab.Screen 

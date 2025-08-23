@@ -109,21 +109,43 @@ class SupabaseRestClient {
 
   // Database methods
   from(table: string) {
-    return new SupabaseTable(this.url, this.headers, table);
+    return new SupabaseTable(this.url, this.key, table);
   }
 }
 
 class SupabaseTable {
   private url: string;
-  private headers: Record<string, string>;
+  private key: string;
   private table: string;
   private query: string;
 
-  constructor(url: string, headers: Record<string, string>, table: string) {
+  constructor(url: string, key: string, table: string) {
     this.url = url;
-    this.headers = headers;
+    this.key = key;
     this.table = table;
     this.query = '';
+  }
+
+  private async getHeaders(): Promise<Record<string, string>> {
+    try {
+      const session = await AsyncStorage.getItem('supabase.auth.token');
+      const token = session ? JSON.parse(session).access_token : this.key;
+      
+      return {
+        'apikey': this.key,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      };
+    } catch (error) {
+      console.error('Error getting auth headers:', error);
+      return {
+        'apikey': this.key,
+        'Authorization': `Bearer ${this.key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      };
+    }
   }
 
   select(columns = '*') {
@@ -192,9 +214,10 @@ class SupabaseTable {
 
   async insert(data: any) {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.url}/rest/v1/${this.table}`, {
         method: 'POST',
-        headers: this.headers,
+        headers,
         body: JSON.stringify(data),
       });
 
@@ -212,9 +235,10 @@ class SupabaseTable {
 
   async update(data: any) {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.url}/rest/v1/${this.table}?${this.query}`, {
         method: 'PATCH',
-        headers: this.headers,
+        headers,
         body: JSON.stringify(data),
       });
 
@@ -232,9 +256,10 @@ class SupabaseTable {
 
   async delete() {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.url}/rest/v1/${this.table}?${this.query}`, {
         method: 'DELETE',
-        headers: this.headers,
+        headers,
       });
 
       if (!response.ok) {
@@ -252,12 +277,14 @@ class SupabaseTable {
     try {
       const queryString = this.query ? `?${this.query}` : '';
       const url = `${this.url}/rest/v1/${this.table}${queryString}`;
+      const headers = await this.getHeaders();
+      
       console.log('REST Client - Executing query:', url);
-      console.log('REST Client - Headers:', this.headers);
+      console.log('REST Client - Headers:', headers);
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: this.headers,
+        headers,
       });
 
       const data = await response.json();

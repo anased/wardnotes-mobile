@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { Linking } from 'react-native';
 
 // Auth
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,6 +33,16 @@ import { RootStackParamList, MainTabParamList } from '../../types/navigation';
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+// Deep linking configuration
+const linking = {
+  prefixes: ['wardnotes://'],
+  config: {
+    screens: {
+      Subscription: 'subscription',
+    },
+  },
+};
 
 // Authenticated user's main tabs
 function MainTabs() {
@@ -173,7 +184,7 @@ export default function AppNavigator() {
   // Show loading screen while checking authentication
   if (loading) {
     return (
-      <NavigationContainer>
+      <NavigationContainer linking={linking}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Loading" component={LoadingScreen} />
         </Stack.Navigator>
@@ -182,7 +193,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       {user ? <AuthenticatedNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );

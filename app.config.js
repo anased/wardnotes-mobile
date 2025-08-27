@@ -19,12 +19,32 @@ export default {
         supportsTablet: true,
         bundleIdentifier: "com.wardnotes.mobile", // Add this
         buildNumber: "1", // Add this
+        infoPlist: {
+          CFBundleURLTypes: [
+            {
+              CFBundleURLName: "wardnotes",
+              CFBundleURLSchemes: ["wardnotes"]
+            }
+          ]
+        }
       },
       android: {
         adaptiveIcon: {
           foregroundImage: "./assets/adaptive-icon.png",
           backgroundColor: "#0ea5e9"
         },
+        intentFilters: [
+          {
+            action: "VIEW",
+            autoVerify: true,
+            data: [
+              {
+                scheme: "wardnotes",
+              },
+            ],
+            category: ["BROWSABLE", "DEFAULT"],
+          },
+        ],
       },
       web: {
         favicon: "./assets/favicon.png"

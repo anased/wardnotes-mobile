@@ -72,7 +72,11 @@ export class SubscriptionService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ isYearly }),
+        body: JSON.stringify({ 
+          isYearly, 
+          isMobile: true,
+          mobileRedirectScheme: 'wardnotes://subscription'
+        }),
       });
 
       if (!response.ok) {

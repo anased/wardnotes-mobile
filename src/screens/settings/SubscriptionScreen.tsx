@@ -1,5 +1,5 @@
 // src/screens/settings/SubscriptionScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../../hooks/useSubscription';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 interface PlanOption {
   type: 'monthly' | 'annual';
@@ -53,6 +54,54 @@ export default function SubscriptionScreen() {
   const { subscription, isPremium, loading, error, redirectToCheckout, manageBilling, refreshSubscription, syncWithStripe } = useSubscription();
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Handle deep links from Stripe checkout
+  useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      console.log('Deep link received:', url);
+      const urlObj = new URL(url);
+      const success = urlObj.searchParams.get('success');
+      const canceled = urlObj.searchParams.get('canceled');
+
+      if (success === 'true') {
+        Alert.alert('Success', 'Your subscription has been activated!');
+        // Refresh subscription status
+        refreshSubscription();
+      } else if (canceled === 'true') {
+        Alert.alert('Canceled', 'Subscription process was canceled.');
+      }
+    };
+
+    // Handle initial deep link if the app was opened from one
+    Linking.getInitialURL().then((url) => {
+      if (url && url.includes('wardnotes://subscription')) {
+        handleDeepLink(url);
+      }
+    });
+
+    // Listen for deep links while the app is running
+    const linkingListener = Linking.addEventListener('url', ({ url }) => {
+      if (url.includes('wardnotes://subscription')) {
+        handleDeepLink(url);
+      }
+    });
+
+    return () => {
+      linkingListener?.remove();
+    };
+  }, [refreshSubscription]);
+
+  // Refresh subscription when screen comes into focus (from Safari)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Add a small delay to ensure the webhook has processed
+      const timer = setTimeout(() => {
+        refreshSubscription();
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }, [refreshSubscription])
+  );
 
   const handleUpgrade = async () => {
     try {

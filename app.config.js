@@ -6,6 +6,7 @@ export default {
       orientation: "portrait",
       icon: "./assets/icon.png",
       userInterfaceStyle: "automatic",
+      scheme: "wardnotes",
       splash: {
         image: "./assets/splash-icon.png",
         resizeMode: "contain",

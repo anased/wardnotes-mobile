@@ -65,10 +65,12 @@ export default function SubscriptionScreen() {
 
       if (success === 'true') {
         Alert.alert('Success', 'Your subscription has been activated!');
-        // Refresh subscription status
+        // Refresh subscription status and clear focus refresh flag
+        setShouldRefreshOnFocus(false);
         refreshSubscription();
       } else if (canceled === 'true') {
         Alert.alert('Canceled', 'Subscription process was canceled.');
+        setShouldRefreshOnFocus(false); // Clear flag on cancel too
       }
     };
 
@@ -91,23 +93,31 @@ export default function SubscriptionScreen() {
     };
   }, [refreshSubscription]);
 
-  // Refresh subscription when screen comes into focus (from Safari)
+  // Track if we should refresh on focus (only after coming back from payment)
+  const [shouldRefreshOnFocus, setShouldRefreshOnFocus] = useState(false);
+
+  // Refresh subscription when screen comes into focus (only if we expect it)
   useFocusEffect(
     React.useCallback(() => {
-      // Add a small delay to ensure the webhook has processed
-      const timer = setTimeout(() => {
-        refreshSubscription();
-      }, 2000);
+      if (shouldRefreshOnFocus) {
+        // Add a small delay to ensure the webhook has processed
+        const timer = setTimeout(() => {
+          refreshSubscription();
+          setShouldRefreshOnFocus(false); // Reset flag after refresh
+        }, 2000);
 
-      return () => clearTimeout(timer);
-    }, [refreshSubscription])
+        return () => clearTimeout(timer);
+      }
+    }, [shouldRefreshOnFocus, refreshSubscription])
   );
 
   const handleUpgrade = async () => {
     try {
       setIsProcessing(true);
+      setShouldRefreshOnFocus(true); // Set flag so we refresh when coming back from payment
       await redirectToCheckout(selectedPlan === 'annual');
     } catch (error) {
+      setShouldRefreshOnFocus(false); // Reset flag if checkout fails
       Alert.alert('Error', 'Failed to start checkout process. Please try again.');
     } finally {
       setIsProcessing(false);
@@ -117,8 +127,10 @@ export default function SubscriptionScreen() {
   const handleManageBilling = async () => {
     try {
       setIsProcessing(true);
+      setShouldRefreshOnFocus(true); // Set flag so we refresh when coming back from billing
       await manageBilling();
     } catch (error) {
+      setShouldRefreshOnFocus(false); // Reset flag if billing portal fails
       Alert.alert('Error', 'Failed to open billing portal. Please try again.');
     } finally {
       setIsProcessing(false);

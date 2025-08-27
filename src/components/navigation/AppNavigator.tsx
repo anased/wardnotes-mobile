@@ -19,6 +19,7 @@ import SettingsScreen from '../../screens/settings/SettingsScreen';
 import ProfileScreen from '../../screens/settings/ProfileScreen';
 import LearningTrackerScreen from '../../screens/learning-tracker/LearningTrackerScreen'; // Add this import
 import NotificationSettingsScreen from '../../screens/settings/NotificationSettingsScreen';
+import SubscriptionScreen from '../../screens/settings/SubscriptionScreen';
 
 // Flashcard screens
 import FlashcardDashboard from '../../screens/flashcards/FlashcardDashboard';
@@ -131,6 +132,11 @@ function AuthenticatedNavigator() {
       <Stack.Screen 
         name="NotificationSettings" 
         component={NotificationSettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="Subscription" 
+        component={SubscriptionScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 

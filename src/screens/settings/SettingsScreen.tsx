@@ -48,6 +48,10 @@ export default function SettingsScreen() {
   const navigateToNotifications = () => {
     navigation.navigate('NotificationSettings');
   };
+
+  const navigateToSubscription = () => {
+    navigation.navigate('Subscription');
+  };
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
@@ -68,6 +72,19 @@ export default function SettingsScreen() {
               <View>
                 <Text style={styles.settingTitle}>Profile</Text>
                 <Text style={styles.settingSubtitle}>{user?.email}</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.settingItem} onPress={navigateToSubscription}>
+            <View style={styles.settingLeft}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="diamond-outline" size={20} color="#0ea5e9" />
+              </View>
+              <View>
+                <Text style={styles.settingTitle}>Subscription</Text>
+                <Text style={styles.settingSubtitle}>Manage your premium plan</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />

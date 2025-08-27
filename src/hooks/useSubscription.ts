@@ -1,64 +1,152 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase/client';
-import { Alert, Linking } from 'react-native';
+// src/hooks/useSubscription.ts
+import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { subscriptionService } from '../services/subscriptionService';
+import { Subscription } from '../types/subscription';
 
 export function useSubscription() {
-  const [subscription, setSubscription] = useState(null);
-  const [isPremium, setIsPremium] = useState(false);
+  const { user } = useAuth();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const isRefreshing = useRef(false);
 
+  // Computed property to check if the user has premium access
+  const isPremium = subscription?.subscription_status === 'active' && 
+                   subscription?.subscription_plan === 'premium';
+
+  // Fetch subscription when user changes
   useEffect(() => {
-    fetchSubscription();
-  }, []);
-
-  const fetchSubscription = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const query = supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', session.user.id);
-        
-      const { data, error } = await query.single();
-
-      if (data) {
-        setSubscription(data);
-        setIsPremium(
-          data.subscription_status === 'active' && 
-          data.subscription_plan === 'premium'
-        );
+    const fetchSubscription = async () => {
+      if (!user) {
+        setSubscription(null);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching subscription:', error);
-    } finally {
-      setLoading(false);
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Try to get existing subscription
+        let userSubscription = await subscriptionService.getSubscription(user.id);
+
+        // If no subscription exists, create a default free one
+        if (!userSubscription) {
+          try {
+            userSubscription = await subscriptionService.createDefaultSubscription(user.id);
+          } catch (createError) {
+            console.error('Error creating default subscription:', createError);
+            // Fall back to a client-side subscription object
+            userSubscription = {
+              id: '0',
+              user_id: user.id,
+              stripe_customer_id: null,
+              stripe_subscription_id: null,
+              subscription_status: 'free',
+              subscription_plan: 'free',
+              valid_until: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+          }
+        }
+
+        setSubscription(userSubscription);
+      } catch (err) {
+        console.error('Error fetching subscription:', err);
+        setError(err as Error);
+        
+        // Set a fallback subscription to prevent UI errors
+        if (user) {
+          setSubscription({
+            id: '0',
+            user_id: user.id,
+            stripe_customer_id: null,
+            stripe_subscription_id: null,
+            subscription_status: 'free',
+            subscription_plan: 'free',
+            valid_until: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubscription();
+  }, [user]);
+
+  // Function to redirect to Stripe Checkout
+  const redirectToCheckout = async (isYearly: boolean = false) => {
+    try {
+      setError(null);
+      await subscriptionService.redirectToCheckout(isYearly);
+    } catch (err) {
+      const error = err as Error;
+      setError(error);
+      throw error;
     }
   };
 
-  const redirectToCheckout = async () => {
+  // Function to redirect to the customer portal
+  const manageBilling = async () => {
     try {
-      // Get session from Supabase
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      setError(null);
+      await subscriptionService.manageBilling();
+    } catch (err) {
+      const error = err as Error;
+      setError(error);
+      throw error;
+    }
+  };
 
-      // Call your web app's API to create checkout session
-      const response = await fetch('https://your-web-app.com/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ isYearly: false }),
-      });
+  // Function to manually refresh subscription data
+  const refreshSubscription = async () => {
+    if (isRefreshing.current || !user) {
+      return;
+    }
 
-      const { url } = await response.json();
+    try {
+      isRefreshing.current = true;
+      setLoading(true);
+      setError(null);
+
+      const userSubscription = await subscriptionService.getSubscription(user.id);
       
-      // Open checkout URL in browser
-      await Linking.openURL(url);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start checkout process');
+      if (userSubscription) {
+        setSubscription(userSubscription);
+      } else {
+        // If no subscription found, create default
+        const defaultSubscription = await subscriptionService.createDefaultSubscription(user.id);
+        setSubscription(defaultSubscription);
+      }
+    } catch (err) {
+      console.error('Error refreshing subscription:', err);
+      setError(err as Error);
+    } finally {
+      setLoading(false);
+      isRefreshing.current = false;
+    }
+  };
+
+  // Function to sync subscription status with Stripe
+  const syncWithStripe = async () => {
+    try {
+      setError(null);
+      const result = await subscriptionService.syncWithStripe();
+      
+      if (result.subscription) {
+        setSubscription(result.subscription);
+      }
+      
+      return result;
+    } catch (err) {
+      const error = err as Error;
+      setError(error);
+      throw error;
     }
   };
 
@@ -66,7 +154,10 @@ export function useSubscription() {
     subscription,
     isPremium,
     loading,
+    error,
     redirectToCheckout,
-    fetchSubscription,
+    manageBilling,
+    refreshSubscription,
+    syncWithStripe
   };
 }

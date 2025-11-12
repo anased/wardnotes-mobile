@@ -354,6 +354,67 @@ This section tracks major feature additions, architectural changes, and importan
 - Implements proven spaced repetition algorithm for effective learning
 - Maintains consistent data model and user experience across platforms
 
+### iOS Build Compatibility Issues (November 2024)
+**Status:** ✅ **RESOLVED** - iOS builds now working via EAS Build with patch-package fix
+
+**What Changed:**
+- Identified iOS build incompatibilities while attempting to run `npm run ios`
+- Two critical blocking issues discovered and resolved
+- Upgraded macOS to 26.1 and Xcode to 16.1.1
+- Implemented permanent TenTap codegen fix using patch-package
+- Successfully built and deployed app using EAS Build
+
+**Technical Details:**
+
+**Issue #1: TenTap Editor Codegen Incompatibility** (RESOLVED)
+- `@10play/tentap-editor@0.7.4` incompatible with React Native 0.79.5 new architecture
+- Codegen fails to generate required C++ headers (TenTapViewProps, TenTapViewComponentDescriptor, RCTTenTapViewViewProtocol)
+- Root cause: Conditional logic in component spec prevents proper codegen
+- **Solution:** Created patch using `patch-package` that extracts codegen call to separate spec file
+- Patch automatically applies via `postinstall` script in package.json
+
+**Issue #2: Expo SDK Requires Xcode 16** (RESOLVED)
+- Expo 53 uses iOS 18 SwiftUI APIs (`onGeometryChange`)
+- Previous system: Xcode 15.4 with iOS 17.5 SDK
+- **Solution:** Upgraded macOS to 26.1 (Sequoia 15.1) and Xcode to 16.1.1
+- Used EAS Build cloud service as interim solution before local simulator runtime download
+
+**Resolution Approach:**
+- Upgraded system: macOS 14.4.1 → 26.1, Xcode 15.4 → 16.1.1
+- Applied TenTap codegen fix via patch-package
+- Used EAS Build with Xcode 16 in cloud (avoided iOS 18.1 simulator download)
+- Successfully built and installed on iPhone 15 iOS 17.5 simulator
+
+**Current State:**
+- ✅ macOS 26.1 (Sequoia 15.1) with Xcode 16.1.1
+- ✅ TenTap codegen fix committed via patch-package
+- ✅ iOS simulator build successful via EAS Build
+- ✅ App tested and working on iPhone 15 simulator
+- ✅ Local builds will work once iOS 18.1 simulator runtime installed
+
+**Files Modified:**
+- `package.json` - Added `postinstall: "patch-package"` script
+- `package-lock.json` - Added patch-package dependency
+- `patches/@10play+tentap-editor+0.7.4.patch` - TenTap codegen fix
+- `CLAUDE.md` - Updated documentation
+- Commit: `f89f0e0` - "Add TenTap editor codegen fix via patch-package"
+
+**Build Information:**
+- EAS Build URL: https://expo.dev/accounts/anased/projects/wardnotes-mobile/builds/12c8ff9a-de77-4576-9818-8d7fa775bed8
+- Build Profile: `preview` (iOS simulator)
+- Build Time: ~10 minutes (cloud build)
+- App Bundle: 30.8 MB
+
+**Future Development:**
+- Use `npx eas build --profile preview --platform ios` for simulator builds
+- Local builds via `npm run ios` will work after downloading iOS 18.1 simulator runtime
+- Patch-package ensures TenTap fix persists across all installs
+- Web and Android development unaffected
+
+**Files Referenced:**
+- `IOS_BUILD_TROUBLESHOOTING.md` - Complete troubleshooting session documentation
+- `patches/@10play+tentap-editor+0.7.4.patch` - TenTap fix implementation
+
 ### Future Update Guidelines
 When adding new features or making significant changes:
 

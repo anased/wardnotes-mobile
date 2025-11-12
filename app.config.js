@@ -25,7 +25,11 @@ export default {
               CFBundleURLName: "wardnotes",
               CFBundleURLSchemes: ["wardnotes"]
             }
-          ]
+          ],
+          NSCameraUsageDescription: "WardNotes needs access to your camera to add photos to your medical notes.",
+          NSPhotoLibraryUsageDescription: "WardNotes needs access to your photo library to add images to your medical notes.",
+          NSPhotoLibraryAddUsageDescription: "WardNotes needs permission to save images to your photo library.",
+          ITSAppUsesNonExemptEncryption: false
         }
       },
       android: {

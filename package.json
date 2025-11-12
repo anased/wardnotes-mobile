@@ -4,9 +4,10 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@10play/tentap-editor": "^0.7.4",
@@ -67,6 +68,7 @@
     "@expo/metro-config": "^0.20.14",
     "@types/react": "~19.0.10",
     "metro-config": "^0.82.4",
+    "patch-package": "^8.0.1",
     "typescript": "~5.8.3"
   },
   "private": true

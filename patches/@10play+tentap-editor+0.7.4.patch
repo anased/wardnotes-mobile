@@ -1,0 +1,44 @@
+diff --git a/node_modules/@10play/tentap-editor/src/TenTapViewNativeComponent.ts b/node_modules/@10play/tentap-editor/src/TenTapViewNativeComponent.ts
+index 6f966ed..4ca3882 100644
+--- a/node_modules/@10play/tentap-editor/src/TenTapViewNativeComponent.ts
++++ b/node_modules/@10play/tentap-editor/src/TenTapViewNativeComponent.ts
+@@ -1,9 +1,8 @@
+ import { Platform, View } from 'react-native';
+ import type { ViewProps } from 'react-native';
+ import type { Int32 } from 'react-native/Libraries/Types/CodegenTypes';
+-import codegenNativeComponent, {
+-  type NativeComponentType,
+-} from 'react-native/Libraries/Utilities/codegenNativeComponent';
++import type { NativeComponentType } from 'react-native/Libraries/Utilities/codegenNativeComponent';
++import TenTapViewNativeComponent from './TenTapViewNativeComponentSpec';
+ 
+ interface NativeProps extends ViewProps {
+   keyboardHeight: Int32;
+@@ -23,7 +22,7 @@ if (Platform.OS === 'ios' || Platform.OS === 'android') {
+       if (Platform.OS === 'ios') {
+         NativeModules.TenTapView.setBridge();
+       }
+-      TenTapView = codegenNativeComponent<NativeProps>('TenTapView');
++      TenTapView = TenTapViewNativeComponent as NativeComponentType<NativeProps>;
+     } else {
+       TenTapView = View as unknown as NativeComponentType<NativeProps>;
+     }
+diff --git a/node_modules/@10play/tentap-editor/src/TenTapViewNativeComponentSpec.ts b/node_modules/@10play/tentap-editor/src/TenTapViewNativeComponentSpec.ts
+new file mode 100644
+index 0000000..d1cf469
+--- /dev/null
++++ b/node_modules/@10play/tentap-editor/src/TenTapViewNativeComponentSpec.ts
+@@ -0,0 +1,13 @@
++import type { ViewProps } from 'react-native';
++import type { Int32 } from 'react-native/Libraries/Types/CodegenTypes';
++import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
++import type { HostComponent } from 'react-native';
++
++interface NativeProps extends ViewProps {
++  keyboardHeight: Int32;
++  keyboardID?: string;
++  inputTag?: Int32;
++  rootBackground?: Int32;
++}
++
++export default codegenNativeComponent<NativeProps>('TenTapView') as HostComponent<NativeProps>;

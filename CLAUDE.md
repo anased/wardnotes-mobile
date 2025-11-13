@@ -508,6 +508,69 @@ npm run ios
 - Add app screenshots and metadata
 - Submit for App Store review when ready
 
+### Flashcard Loading Fix & Note Detail UX Improvements (November 2025)
+**Status:** ✅ **RESOLVED** - Infinite loading bug fixed and UI improvements implemented
+
+**What Changed:**
+- Fixed critical infinite loading bug in flashcard hooks
+- Improved Note Detail screen UX by removing unnecessary visual clutter
+- Enhanced content readability with cleaner layout
+- Updated Xcode to 26.1.1 and resolved iOS 26.1 simulator compatibility
+
+**Technical Details:**
+
+**Issue #1: Infinite Loading in NoteFlashcards Component** (RESOLVED)
+- **Root Cause:** Object dependencies in `useCallback` causing infinite re-render loops
+- **Affected Hooks:** `useFlashcards`, `useDueFlashcards`, `useStudyCards`
+- **Problem:** Passing `filters` object (`{ note_id: noteId }`) as dependency - new object created on every render
+- **Solution:** Convert object to stable string dependency using `JSON.stringify(filters)` as `filtersKey`
+- **Additional Cleanup:** Removed excessive console.log statements from `useDecksWithStats`
+
+**Issue #2: Note Detail Screen UX Clutter** (RESOLVED)
+- **Problem:** Content displayed in bordered white box with redundant "Content:" label
+- **Impact:** Reduced readability, wasted vertical space, visual hierarchy conflict
+- **Solution:** Implemented clean, minimal design following Option 1 approach:
+  - Removed "Content:" label entirely
+  - Removed bordered box styling from content area
+  - Added subtle horizontal divider before flashcards section
+  - Updated TipTapEditor read-only mode: transparent background, no border, adjusted padding
+
+**Xcode 26.1.1 Compatibility:**
+- Upgraded to macOS 26.1, Xcode 26.1.1, iOS 26.1
+- **Known Issue:** CoreSVG asset catalog compilation bug with Stripe dependencies
+- **Workaround:** Use EAS Build when local builds fail due to asset catalog errors
+- Successfully tested app with iOS 26.1 simulator after installing runtime
+
+**Files Modified:**
+- `src/hooks/useFlashcards.ts` - Fixed infinite loop with stable dependencies (all 3 hooks)
+- `src/hooks/useDecks.ts` - Removed debug logging from `useDecksWithStats`
+- `src/screens/notes/NoteDetailScreen.tsx` - Removed "Content:" label, removed box styling, added divider
+- `src/components/notes/NoteFlashcards.tsx` - Adjusted spacing
+- `src/components/notes/TipTapEditor.tsx` - Updated read-only mode styling for clean display
+- Commit: `00008c5` - "Add flashcards-from-note feature and fix infinite loading issue"
+
+**Before & After:**
+- **Before:** Content in bordered white box with "Content:" label, flashcards showed continuous loading
+- **After:** Content flows naturally on page, proper loading state handling, clean visual separation
+
+**Testing Results:**
+- ✅ Flashcard loading completes successfully (no infinite loops)
+- ✅ Empty state displays correctly ("No flashcards generated yet")
+- ✅ Content displays without unnecessary borders
+- ✅ Improved readability with cleaner layout
+- ✅ Proper visual hierarchy maintained
+
+**Impact:**
+- Significantly improved UX for note viewing
+- Resolved critical infinite loading bug affecting user experience
+- Better content readability and visual flow
+- Maintains consistency with modern mobile design patterns
+
+**Development Notes:**
+- Xcode 26.1.1 CoreSVG bug is Apple toolchain issue, not code issue
+- EAS Build recommended for reliable builds until Apple resolves asset catalog bug
+- Object dependencies in React hooks should always be stabilized with useMemo or string conversion
+
 ### Future Update Guidelines
 When adding new features or making significant changes:
 

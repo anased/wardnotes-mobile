@@ -208,7 +208,7 @@ export default function NoteFlashcards({ noteId }: NoteFlashcardsProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 24,
+    marginTop: 0,
   },
   header: {
     flexDirection: 'row',

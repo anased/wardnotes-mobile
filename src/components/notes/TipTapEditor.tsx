@@ -253,7 +253,9 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
   },
   readOnlyContainer: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderRadius: 0,
   },
   editor: {
     flex: 1,
@@ -262,5 +264,6 @@ const styles = StyleSheet.create({
   },
   readOnlyEditor: {
     backgroundColor: 'transparent',
+    paddingHorizontal: 0,
   },
 });

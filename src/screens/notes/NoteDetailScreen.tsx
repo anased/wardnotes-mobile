@@ -411,7 +411,6 @@ export default function NoteDetailScreen() {
         )}
 
         <View style={styles.contentContainer}>
-          <Text style={styles.contentLabel}>Content:</Text>
           {note.content ? (
             <View style={styles.editorContainer}>
               <TipTapEditor
@@ -430,6 +429,8 @@ export default function NoteDetailScreen() {
             </View>
           )}
         </View>
+
+        <View style={styles.divider} />
 
         <NoteFlashcards noteId={noteId} />
       </ScrollView>
@@ -545,19 +546,15 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-  },
-  contentLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 12,
+    marginBottom: 24,
   },
   editorContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
     minHeight: 300,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 24,
   },
   noContentContainer: {
     backgroundColor: 'white',

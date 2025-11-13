@@ -164,35 +164,39 @@ export class FlashcardService {
   
   static async getFlashcards(filters?: FlashcardSearchFilters): Promise<Flashcard[]> {
     const user = await this.getAuthenticatedUser();
-    
+
     let query = supabase
       .from('flashcards')
       .select('*')
       .eq('user_id', user.id);
-    
+
     if (filters?.deck_id) {
       query = query.eq('deck_id', filters.deck_id);
     }
-    
+
+    if (filters?.note_id) {
+      query = query.eq('note_id', filters.note_id);
+    }
+
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
-    
+
     if (filters?.card_type) {
       query = query.eq('card_type', filters.card_type);
     }
-    
+
     if (filters?.due_only) {
       query = query.lte('next_review', new Date().toISOString());
     }
-    
+
     if (filters?.search_text) {
       // Simple text search - mobile version is simplified
       query = query.or(`front_content.ilike.%${filters.search_text}%,back_content.ilike.%${filters.search_text}%,cloze_content.ilike.%${filters.search_text}%`);
     }
-    
+
     query = query.order('next_review', { ascending: true });
-    
+
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
@@ -317,7 +321,47 @@ export class FlashcardService {
       this.getDueCards(deckId, maxDue),
       this.getNewFlashcards(deckId, maxNew)
     ]);
-    
+
+    // Combine and shuffle
+    const allCards = [...dueCards, ...newCards];
+    return allCards.sort(() => Math.random() - 0.5);
+  }
+
+  static async getStudyCardsForNote(noteId: string, maxDue: number = 30, maxNew: number = 10): Promise<Flashcard[]> {
+    const user = await this.getAuthenticatedUser();
+
+    // Get due cards for this note
+    const dueQuery = supabase
+      .from('flashcards')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('note_id', noteId)
+      .lte('next_review', new Date().toISOString())
+      .neq('status', 'suspended')
+      .order('next_review', { ascending: true })
+      .limit(maxDue);
+
+    // Get new cards for this note
+    const newQuery = supabase
+      .from('flashcards')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('note_id', noteId)
+      .eq('status', 'new')
+      .order('created_at', { ascending: true })
+      .limit(maxNew);
+
+    const [dueResult, newResult] = await Promise.all([
+      dueQuery,
+      newQuery
+    ]);
+
+    if (dueResult.error) throw dueResult.error;
+    if (newResult.error) throw newResult.error;
+
+    const dueCards = dueResult.data || [];
+    const newCards = newResult.data || [];
+
     // Combine and shuffle
     const allCards = [...dueCards, ...newCards];
     return allCards.sort(() => Math.random() - 0.5);

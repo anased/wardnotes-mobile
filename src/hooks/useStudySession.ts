@@ -97,25 +97,33 @@ export const useMobileStudySession = () => {
   const cardStartTimeRef = useRef<number>(0);
 
   const startMobileSession = useCallback(async (
-    deckId: string,
-    mode: MobileStudyMode
+    deckIdOrNoteId: string,
+    mode: MobileStudyMode,
+    isNoteSession: boolean = false
   ) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Get study cards based on mode
+      // Get study cards based on mode and session type
       let cards: Flashcard[] = [];
-      switch (mode.mode) {
-        case 'new':
-          cards = await FlashcardService.getNewFlashcards(deckId, mode.card_limit || 10);
-          break;
-        case 'review':
-          cards = await FlashcardService.getDueCards(deckId, mode.card_limit || 30);
-          break;
-        case 'mixed':
-          cards = await FlashcardService.getStudyCards(deckId, 15, 5);
-          break;
+
+      if (isNoteSession) {
+        // For note-based sessions, always use mixed mode
+        cards = await FlashcardService.getStudyCardsForNote(deckIdOrNoteId, 30, 10);
+      } else {
+        // For deck-based sessions, use the specified mode
+        switch (mode.mode) {
+          case 'new':
+            cards = await FlashcardService.getNewFlashcards(deckIdOrNoteId, mode.card_limit || 10);
+            break;
+          case 'review':
+            cards = await FlashcardService.getDueCards(deckIdOrNoteId, mode.card_limit || 30);
+            break;
+          case 'mixed':
+            cards = await FlashcardService.getStudyCards(deckIdOrNoteId, 15, 5);
+            break;
+        }
       }
 
       if (cards.length === 0) {
@@ -124,10 +132,10 @@ export const useMobileStudySession = () => {
 
       const sessionId = Date.now().toString();
       const startTime = Date.now();
-      
+
       const newMobileSession: MobileFlashcardSession = {
         session_id: sessionId,
-        deck_id: deckId,
+        deck_id: isNoteSession ? '' : deckIdOrNoteId,
         cards,
         current_index: 0,
         start_time: startTime,
@@ -139,7 +147,7 @@ export const useMobileStudySession = () => {
       setShowAnswer(false);
       startTimeRef.current = startTime;
       cardStartTimeRef.current = startTime;
-      
+
       // Reset stats
       setSessionStats({
         totalCards: 0,

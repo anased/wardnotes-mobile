@@ -19,9 +19,12 @@ import type { ReviewQuality, MobileStudyMode } from '../../types/flashcard';
 export default function StudyScreen() {
   const navigation = useNavigation<MainTabNavigationProp>();
   const route = useRoute<StudyScreenRouteProp>();
-  const { deckId, mode = 'mixed' } = route.params;
-  
-  const { deck } = useDeck(deckId);
+  const { deckId, noteId, mode = 'mixed' } = route.params;
+
+  const isNoteSession = !!noteId;
+  const sessionId = noteId || deckId || '';
+
+  const { deck } = useDeck(deckId || null);
   const {
     mobileSession,
     currentCard,
@@ -40,13 +43,17 @@ export default function StudyScreen() {
   const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
-    if (deck && !hasStarted && !loading) {
+    // For deck sessions, wait for deck to load
+    // For note sessions, start immediately
+    const canStart = isNoteSession ? !hasStarted : (deck && !hasStarted);
+
+    if (canStart && !loading && sessionId) {
       const studyMode: MobileStudyMode = {
         mode,
         card_limit: mode === 'new' ? 10 : mode === 'review' ? 30 : 20,
       };
-      
-      startMobileSession(deckId, studyMode)
+
+      startMobileSession(sessionId, studyMode, isNoteSession)
         .then(() => setHasStarted(true))
         .catch((err) => {
           Alert.alert('Error', err.message, [
@@ -54,7 +61,7 @@ export default function StudyScreen() {
           ]);
         });
     }
-  }, [deck, hasStarted, loading, startMobileSession, deckId, mode, navigation]);
+  }, [deck, hasStarted, loading, startMobileSession, sessionId, mode, navigation, isNoteSession]);
 
   const handleShowAnswer = () => {
     showCardAnswer();
@@ -93,14 +100,16 @@ export default function StudyScreen() {
       <TouchableOpacity style={styles.backButton} onPress={handleEndSession}>
         <Text style={styles.backButtonText}>✕</Text>
       </TouchableOpacity>
-      
+
       <View style={styles.headerContent}>
-        <Text style={styles.deckName}>{deck?.name}</Text>
+        <Text style={styles.deckName}>
+          {isNoteSession ? 'Note Flashcards' : (deck?.name || 'Study Session')}
+        </Text>
         <Text style={styles.progressText}>
           {progress.current} / {progress.total}
         </Text>
       </View>
-      
+
       <View style={styles.headerRight}>
         <Text style={styles.accuracyText}>
           {sessionStats.accuracy.toFixed(0)}%

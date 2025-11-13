@@ -16,6 +16,7 @@ import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import TipTapEditor from '../../components/notes/TipTapEditor';
 import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
+import NoteFlashcards from '../../components/notes/NoteFlashcards';
 import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
 import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
 
@@ -429,6 +430,8 @@ export default function NoteDetailScreen() {
             </View>
           )}
         </View>
+
+        <NoteFlashcards noteId={noteId} />
       </ScrollView>
     </SafeAreaView>
   );

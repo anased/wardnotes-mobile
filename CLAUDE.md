@@ -415,6 +415,99 @@ This section tracks major feature additions, architectural changes, and importan
 - `IOS_BUILD_TROUBLESHOOTING.md` - Complete troubleshooting session documentation
 - `patches/@10play+tentap-editor+0.7.4.patch` - TenTap fix implementation
 
+### TestFlight Deployment (November 2024)
+**Status:** ✅ **LIVE** - App successfully deployed to TestFlight and tested on physical iPhone
+
+**What Changed:**
+- Successfully configured and deployed production iOS build to TestFlight
+- Resolved EAS Build Node.js version configuration issues
+- Added required Apple privacy descriptions for App Store compliance
+- First production build submitted and approved for TestFlight distribution
+
+**Technical Details:**
+
+**Challenge #1: EAS Build Node Version Not Applied**
+- Initial builds used Node 18.18.0 despite `eas.json` configuration
+- **Root Cause:** Running build command from wrong directory (web app instead of mobile app)
+- **Solution:** Ensured command run from correct directory + added `engines` field to package.json
+- Both `eas.json` and `package.json` now specify Node >=20.19.4
+
+**Challenge #2: Apple Privacy Strings Missing**
+- Manual Transporter upload failed with NSCameraUsageDescription error
+- **Root Cause:** TenTap editor and other dependencies reference camera/photo APIs
+- **Solution:** Added privacy descriptions to `app.config.js`:
+  - `NSCameraUsageDescription` - Camera access for adding photos to notes
+  - `NSPhotoLibraryUsageDescription` - Photo library access for images in notes
+  - `NSPhotoLibraryAddUsageDescription` - Permission to save images
+  - `ITSAppUsesNonExemptEncryption` - Declare no custom encryption
+
+**Deployment Process:**
+1. Fixed directory context issue (was in web app directory)
+2. Added Node.js engine requirement to package.json
+3. Added iOS privacy descriptions to app.config.js
+4. Built production IPA via EAS Build
+5. Initially attempted auto-submit (queued 40+ minutes)
+6. Manually submitted via Apple Transporter after adding privacy strings
+7. Successfully uploaded to App Store Connect
+8. Build processed by Apple (~15-30 minutes)
+9. TestFlight distribution enabled
+10. Successfully tested on physical iPhone
+
+**Current State:**
+- ✅ Production build successfully deployed to TestFlight
+- ✅ App tested and working on physical iPhone
+- ✅ EAS Build properly configured with Node 20.19.4
+- ✅ All required Apple privacy descriptions included
+- ✅ Ready for additional tester distribution
+- ✅ Ready for App Store submission when needed
+
+**Files Modified:**
+- `app.config.js` - Added iOS privacy descriptions (NSCamera*, NSPhotoLibrary*)
+- `package.json` - Added `engines: { "node": ">=20.19.4" }` field
+- `eas.json` - Already had Node version specified (commit 5acfee8)
+- Commit: `71377e6` - "Add required iOS privacy descriptions to Info.plist"
+- Commit: `6eb1968` - "Add Node.js engine requirement to package.json"
+
+**Build Information:**
+- **Bundle ID:** `com.anased.wardnotes`
+- **Build Number:** 4
+- **Profile:** production
+- **Distribution:** TestFlight (internal testing)
+- **Node Version:** 20.19.4
+- **Xcode Version:** 15.4 (on EAS Build VM)
+- **Build Time:** ~15-20 minutes (EAS cloud build)
+
+**Lessons Learned:**
+1. **Directory Context Matters:** Always verify you're in the mobile app directory when running EAS commands
+2. **Multiple Node Config Methods:** Specify Node version in both `eas.json` AND `package.json` engines field
+3. **Privacy Strings Required:** Even if app doesn't actively use camera/photos, dependencies may reference APIs requiring descriptions
+4. **Manual Submission Option:** If EAS auto-submit queue is too long, Apple Transporter is a reliable alternative
+5. **Free Tier Queues:** Build queue and submission queue are separate; submission queue can be unpredictably long on free tier
+
+**Future Builds:**
+```bash
+# For TestFlight/App Store production builds
+npx eas build --platform ios --profile production --auto-submit
+
+# For simulator testing
+npx eas build --profile preview --platform ios
+
+# For local development (requires iOS 18.1 simulator)
+npm run ios
+```
+
+**TestFlight Distribution:**
+- Access TestFlight builds at: https://appstoreconnect.apple.com
+- Add testers via App Store Connect → TestFlight tab
+- Testers download via TestFlight app on their devices
+- Internal testing group "Team (Expo)" already created
+
+**Next Steps for App Store:**
+- Continue testing on TestFlight
+- Gather user feedback and iterate
+- Add app screenshots and metadata
+- Submit for App Store review when ready
+
 ### Future Update Guidelines
 When adding new features or making significant changes:
 

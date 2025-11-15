@@ -1,5 +1,5 @@
 // src/screens/notes/EditNoteScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Modal,
 } from 'react-native';
@@ -19,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
-import TipTapEditor, { TipTapEditorRef } from '../../components/notes/TipTapEditor';
+import NativeNoteEditor from '../../components/notes/NativeNoteEditor';
 import { CombinedNavigationProp, EditNoteRouteProp } from '../../types/navigation';
 import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
 
@@ -162,7 +160,6 @@ export default function EditNoteScreen() {
   const { noteId } = route.params;
 
   const [note, setNote] = useState<any>(null);
-  const editorRef = useRef<TipTapEditorRef>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState<any>(null);
   const [category, setCategory] = useState('');
@@ -245,18 +242,8 @@ export default function EditNoteScreen() {
       console.error('🔥 INSIDE TRY BLOCK');
       console.log('🟢 === SAVE BUTTON PRESSED ===');
       
-      // Force content synchronization from editor before saving
+      // Use content from state (managed by NativeNoteEditor)
       let finalContent = content;
-      if (editorRef.current) {
-        console.log('🔄 Forcing content update from editor...');
-        await editorRef.current.forceContentUpdate();
-        // Get the latest content directly from editor
-        const latestContent = await editorRef.current.getCurrentContent();
-        if (latestContent) {
-          finalContent = latestContent;
-          console.log('✓ Got latest content from editor:', finalContent);
-        }
-      }
       
       console.log('🟢 Final content to save:', finalContent);
       console.log('🟢 Content type:', typeof finalContent);
@@ -410,10 +397,7 @@ export default function EditNoteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
+      <View style={styles.content}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.cancelButton}>Cancel</Text>
@@ -439,7 +423,7 @@ export default function EditNoteScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <TextInput
             style={styles.titleInput}
             placeholder="Enter note title..."
@@ -489,53 +473,11 @@ export default function EditNoteScreen() {
 
           <View style={styles.editorContainer}>
             <Text style={styles.label}>Content</Text>
-            <TipTapEditor
-              key={noteId} // Use noteId as key to prevent unnecessary remounts
+            <NativeNoteEditor
+              key={noteId}
               initialContent={content}
-              ref={editorRef}
-              onContentChange={(newContent) => {
-                console.log('=== CONTENT CHANGE CALLBACK ===');
-                console.log('New content received:', newContent);
-                console.log('New content type:', typeof newContent);
-                
-                // Handle content updates synchronously to ensure state consistency
-                if (typeof newContent === 'string') {
-                  console.log('Received HTML content, converting to TipTap...');
-                  try {
-                    const { convertHtmlToTipTap } = require('../../utils/tiptapConverter');
-                    const tipTapContent = convertHtmlToTipTap(newContent);
-                    console.log('Converted to TipTap:', JSON.stringify(tipTapContent, null, 2));
-                    setContent(tipTapContent);
-                  } catch (error: any) {
-                    console.error('Error converting HTML to TipTap:', error);
-                    // Fallback: create a simple TipTap structure with the HTML content
-                    const fallbackContent = {
-                      type: 'doc',
-                      content: [{
-                        type: 'paragraph',
-                        content: [{ type: 'text', text: newContent.replace(/<[^>]*>/g, '') }]
-                      }]
-                    };
-                    console.log('Using fallback content:', JSON.stringify(fallbackContent, null, 2));
-                    setContent(fallbackContent);
-                  }
-                } else if (newContent && typeof newContent === 'object') {
-                  console.log('Received TipTap content directly');
-                  setContent(newContent);
-                } else {
-                  console.log('Received invalid content, using fallback');
-                  const fallbackContent = {
-                    type: 'doc',
-                    content: [{
-                      type: 'paragraph',
-                      content: [{ type: 'text', text: String(newContent || '') }]
-                    }]
-                  };
-                  setContent(fallbackContent);
-                }
-                console.log('✓ Content state updated successfully');
-              }}
-              editable={true}
+              onContentChange={setContent}
+              placeholder="Start writing your medical note..."
             />
           </View>
         </ScrollView>
@@ -600,7 +542,7 @@ export default function EditNoteScreen() {
             </View>
           </Modal>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -610,7 +552,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  keyboardView: {
+  content: {
     flex: 1,
   },
   header: {
@@ -645,7 +587,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  content: {
+  scrollContent: {
     flex: 1,
     padding: 15,
   },

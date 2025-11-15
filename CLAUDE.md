@@ -21,7 +21,7 @@ WardNotes Mobile is a React Native app built with Expo that provides cross-platf
 - Key tables: notes, categories, tags, flashcards, flashcard_decks, daily_activity, subscriptions
 
 ### Core Features
-1. **Notes System** - Rich text editing with TipTap mobile editor, categories, and tags
+1. **Notes System** - Native markdown editor with iOS keyboard toolbar, categories, and tags
 2. **Flashcard System** - AI-generated flashcards from notes with spaced repetition
 3. **Activity Tracking** - Daily note counts and streak tracking
 4. **Premium Subscriptions** - Stripe integration for premium features
@@ -33,7 +33,44 @@ WardNotes Mobile is a React Native app built with Expo that provides cross-platf
 - **React Navigation** for native navigation stack
 - **Custom Supabase REST client** (no realtime features for mobile compatibility)
 - **AsyncStorage** for local session persistence
-- **TipTap Editor** via @10play/tentap-editor for rich text editing
+- **Native Editor** - Markdown-based editing with native TextInput and InputAccessoryView keyboard toolbar
+
+### Current Editor Architecture (November 2025)
+
+**Note Viewing:**
+- Native renderer using 100% React Native Text/View components
+- Parses TipTap JSON from database into native-friendly block structure
+- Zero WebView usage for optimal performance
+- Mobile-optimized typography (H1: 24px, H2: 20px, H3: 18px, Body: 16px)
+- Supports headings, paragraphs, lists, blockquotes, code blocks, text formatting
+
+**Note Editing:**
+- Native TextInput with markdown syntax (`## Heading`, `- List`, etc.)
+- InputAccessoryView keyboard-attached formatting toolbar (iOS-native)
+- Real-time conversion from markdown to TipTap JSON on save
+- Formatting buttons: H1, H2, H3, Bold, Italic, Bullet List, Ordered List, Undo/Redo
+- Toolbar appears/disappears automatically with keyboard
+- Matches Apple Notes, WhatsApp, Messages UX patterns
+
+**Data Flow:**
+```
+1. Database stores TipTap JSON (shared with web app)
+2. Viewing: TipTap JSON → Parser → Native React Native components
+3. Editing: TipTap JSON → Markdown text → User edits → TipTap JSON → Save
+```
+
+**Key Files:**
+- `src/components/notes/NativeNoteEditor.tsx` - Markdown editor with formatting toolbar
+- `src/components/notes/FormattingToolbar.tsx` - iOS-native keyboard toolbar
+- `src/components/notes/NativeNoteRenderer.tsx` - Native viewing component
+- `src/utils/tiptapNativeParser.ts` - TipTap JSON parser
+- `src/utils/nativeToTipTap.ts` - Markdown ↔ TipTap converter
+
+**Cross-Platform Compatibility:**
+- ✅ Same TipTap JSON storage format as web app
+- ✅ Content syncs perfectly between mobile and web
+- ✅ Web uses TipTap WYSIWYG editor, mobile uses native components
+- ✅ No data migration required
 
 ### Key Directories
 - `src/components/` - React Native components organized by feature
@@ -71,10 +108,11 @@ WardNotes Mobile is a React Native app built with Expo that provides cross-platf
 - **Offline-first auth** - Session persistence for offline access
 
 ### Content Management
-- **TipTap Content Format** - Rich text stored as TipTap JSON documents (same as web)
-- **Cross-platform compatibility** - Content conversion utilities for mobile/web sync
-- **Table detection** - Automatic web-only mode for complex formatting
-- **Content polling** - Regular content change detection for editor updates
+- **TipTap JSON Storage** - Rich text stored as TipTap JSON documents (same as web)
+- **Native Rendering** - Custom parser converts TipTap JSON to native React Native components
+- **Markdown Editing** - Native TextInput with markdown syntax, converts to TipTap JSON on save
+- **Cross-platform compatibility** - Seamless sync between mobile (native) and web (TipTap editor)
+- **Table detection** - Complex formatting (tables) requires web-only editing mode
 
 ## Code Style Guidelines
 
@@ -291,293 +329,98 @@ This procedure has successfully resolved iOS Simulator issues in the past.
 
 ## Recent Changes & Updates
 
-This section tracks major feature additions, architectural changes, and important fixes to help future Claude instances understand the project evolution.
+This section highlights the most recent major changes. For complete project history, see [CHANGELOG.md](./CHANGELOG.md).
 
-### Flashcard System Implementation (August 2024)
-**What Changed:**
-- Complete mobile flashcard system implementation with spaced repetition (SM-2 algorithm)
-- Cross-platform compatibility with existing web app flashcard data
-- Full study workflow with mobile-optimized UI components
-
-**Technical Details:**
-**Phase 1 - Core Infrastructure:**
-- **Types**: Created comprehensive TypeScript interfaces in `src/types/flashcard.ts` for mobile flashcard system
-- **REST Client Extensions**: Extended `src/services/supabase/rest-client.ts` with additional query methods (lte, gte, neq, in, or)
-- **Authentication Fix**: Implemented dynamic token fetching to resolve authentication issues with flashcard data loading
-- **Custom Hooks**: Built `src/hooks/useDecks.ts`, `src/hooks/useFlashcards.ts`, and `src/hooks/useStudySession.ts` for state management
-- **Navigation**: Updated `src/types/navigation.ts` to include flashcard screens (DeckScreen, StudyScreen, CreateCard)
-
-**Phase 2 - Screen Implementation:**
-- **FlashcardDashboard**: Main dashboard screen (`src/screens/flashcards/FlashcardDashboard.tsx`) with deck overview and statistics
-- **DeckScreen**: Deck management screen (`src/screens/flashcards/DeckScreen.tsx`) for individual deck operations
-- **StudyScreen**: Complete study interface (`src/screens/flashcards/StudyScreen.tsx`) with progress tracking and session management
-- **CreateCardScreen**: Card creation interface (`src/screens/flashcards/CreateCardScreen.tsx`)
-
-**Phase 3 - Study Components:**
-- **FlashcardView**: Mobile-optimized card display component (`src/components/flashcards/FlashcardView.tsx`) supporting front/back and cloze deletion
-- **Review Interface**: Touch-friendly 4-point rating system for spaced repetition reviews
-- **Study Session Management**: Complete session tracking with statistics and completion flow
-
-**Service Layer:**
-- **FlashcardService**: Full service implementation (`src/services/flashcardService.ts`) with SM-2 spaced repetition algorithm
-- **CRUD Operations**: Complete deck and flashcard management functionality
-- **Statistics**: Real-time deck statistics calculation and study session tracking
-
-**Files Added/Modified:**
-- `src/types/flashcard.ts` - Complete mobile flashcard type definitions
-- `src/services/supabase/rest-client.ts` - Extended with flashcard query methods and authentication fixes
-- `src/services/flashcardService.ts` - Complete flashcard service with SM-2 algorithm
-- `src/hooks/useDecks.ts`, `src/hooks/useFlashcards.ts`, `src/hooks/useStudySession.ts` - Custom React hooks
-- `src/screens/flashcards/` - All flashcard screen components
-- `src/components/flashcards/FlashcardView.tsx` - Core flashcard display component
-- `src/types/navigation.ts` - Extended navigation types
-- `src/screens/main/MainTabs.tsx` - Added flashcard tab
-
-**Bug Fixes During Implementation:**
-1. **UI Layout Issue**: Content overlapping status bar - fixed with SafeAreaView and StatusBar components
-2. **Authentication Issue**: Static headers not updating after login - resolved with dynamic token fetching in REST client
-3. **Query Chaining Issue**: REST client methods not returning 'this' - fixed by restructuring query builder pattern to support method chaining for insert/update/delete operations
-
-**Testing Results:**
-- Successfully tested flashcard creation, study sessions, and review submissions
-- Confirmed cross-platform data compatibility between mobile and web versions
-- Verified spaced repetition algorithm functioning correctly with proper interval calculations
-
-**Development Workflow:**
-- Developed on feature branch `feature/mobile-flashcards`
-- Systematic testing and bug resolution through iOS Simulator
-- Successfully merged to main branch after complete testing
-
-**Impact:**
-- Mobile app now has full feature parity with web app for flashcard functionality
-- Users can seamlessly study flashcards across mobile and web platforms
-- Implements proven spaced repetition algorithm for effective learning
-- Maintains consistent data model and user experience across platforms
-
-### iOS Build Compatibility Issues (November 2024)
-**Status:** ✅ **RESOLVED** - iOS builds now working via EAS Build with patch-package fix
+### Native Editor & Keyboard Toolbar (November 2025)
+**Status:** ✅ **COMPLETE**
 
 **What Changed:**
-- Identified iOS build incompatibilities while attempting to run `npm run ios`
-- Two critical blocking issues discovered and resolved
-- Upgraded macOS to 26.1 and Xcode to 16.1.1
-- Implemented permanent TenTap codegen fix using patch-package
-- Successfully built and deployed app using EAS Build
+- Replaced WebView-based TipTap editor with native React Native components
+- Built custom TipTap JSON parser for native rendering
+- Implemented markdown-based editing with native TextInput
+- Added InputAccessoryView keyboard-attached formatting toolbar (iOS-native)
+- Achieved true iOS Notes-like experience
 
-**Technical Details:**
+**Key Features:**
+- **Viewing:** Native renderer (zero WebView overhead)
+- **Editing:** Markdown syntax with formatting toolbar
+- **Toolbar:** Attached to keyboard, appears/disappears automatically
+- **Buttons:** H1, H2, H3, Bold, Italic, Lists, Undo/Redo
+- **Performance:** Native scrolling, instant rendering
+- **Cross-platform:** Same TipTap JSON storage as web app
 
-**Issue #1: TenTap Editor Codegen Incompatibility** (RESOLVED)
-- `@10play/tentap-editor@0.7.4` incompatible with React Native 0.79.5 new architecture
-- Codegen fails to generate required C++ headers (TenTapViewProps, TenTapViewComponentDescriptor, RCTTenTapViewViewProtocol)
-- Root cause: Conditional logic in component spec prevents proper codegen
-- **Solution:** Created patch using `patch-package` that extracts codegen call to separate spec file
-- Patch automatically applies via `postinstall` script in package.json
+**Files:**
+- `src/components/notes/NativeNoteEditor.tsx` - Editor component
+- `src/components/notes/FormattingToolbar.tsx` - Keyboard toolbar
+- `src/components/notes/NativeNoteRenderer.tsx` - Viewing component
+- `src/utils/tiptapNativeParser.ts` - TipTap JSON parser
+- `src/utils/nativeToTipTap.ts` - Markdown converter
 
-**Issue #2: Expo SDK Requires Xcode 16** (RESOLVED)
-- Expo 53 uses iOS 18 SwiftUI APIs (`onGeometryChange`)
-- Previous system: Xcode 15.4 with iOS 17.5 SDK
-- **Solution:** Upgraded macOS to 26.1 (Sequoia 15.1) and Xcode to 16.1.1
-- Used EAS Build cloud service as interim solution before local simulator runtime download
+**Impact:** Massive UX improvement, matches industry standards (Apple Notes, Evernote)
 
-**Resolution Approach:**
-- Upgraded system: macOS 14.4.1 → 26.1, Xcode 15.4 → 16.1.1
-- Applied TenTap codegen fix via patch-package
-- Used EAS Build with Xcode 16 in cloud (avoided iOS 18.1 simulator download)
-- Successfully built and installed on iPhone 15 iOS 17.5 simulator
+---
 
-**Current State:**
-- ✅ macOS 26.1 (Sequoia 15.1) with Xcode 16.1.1
-- ✅ TenTap codegen fix committed via patch-package
-- ✅ iOS simulator build successful via EAS Build
-- ✅ App tested and working on iPhone 15 simulator
-- ✅ Local builds will work once iOS 18.1 simulator runtime installed
+### Flashcard Loading Fix & UX Improvements (November 2025)
+**Status:** ✅ **RESOLVED**
+
+**What Changed:**
+- Fixed infinite loading bug in flashcard hooks (useCallback object dependencies)
+- Improved Note Detail screen UX (removed clutter, enhanced readability)
+- Updated Xcode to 26.1.1, resolved iOS 26.1 simulator compatibility
 
 **Files Modified:**
-- `package.json` - Added `postinstall: "patch-package"` script
-- `package-lock.json` - Added patch-package dependency
-- `patches/@10play+tentap-editor+0.7.4.patch` - TenTap codegen fix
-- `CLAUDE.md` - Updated documentation
-- Commit: `f89f0e0` - "Add TenTap editor codegen fix via patch-package"
+- `src/hooks/useFlashcards.ts` - Fixed infinite loop with stable dependencies
+- `src/screens/notes/NoteDetailScreen.tsx` - Cleaner layout
 
-**Build Information:**
-- EAS Build URL: https://expo.dev/accounts/anased/projects/wardnotes-mobile/builds/12c8ff9a-de77-4576-9818-8d7fa775bed8
-- Build Profile: `preview` (iOS simulator)
-- Build Time: ~10 minutes (cloud build)
-- App Bundle: 30.8 MB
+**Impact:** Resolved critical bug, improved content readability
 
-**Future Development:**
-- Use `npx eas build --profile preview --platform ios` for simulator builds
-- Local builds via `npm run ios` will work after downloading iOS 18.1 simulator runtime
-- Patch-package ensures TenTap fix persists across all installs
-- Web and Android development unaffected
-
-**Files Referenced:**
-- `IOS_BUILD_TROUBLESHOOTING.md` - Complete troubleshooting session documentation
-- `patches/@10play+tentap-editor+0.7.4.patch` - TenTap fix implementation
+---
 
 ### TestFlight Deployment (November 2024)
-**Status:** ✅ **LIVE** - App successfully deployed to TestFlight and tested on physical iPhone
+**Status:** ✅ **LIVE**
 
 **What Changed:**
-- Successfully configured and deployed production iOS build to TestFlight
-- Resolved EAS Build Node.js version configuration issues
-- Added required Apple privacy descriptions for App Store compliance
-- First production build submitted and approved for TestFlight distribution
+- First production build deployed to TestFlight
+- Resolved EAS Build Node.js version configuration
+- Added required Apple privacy descriptions
 
-**Technical Details:**
-
-**Challenge #1: EAS Build Node Version Not Applied**
-- Initial builds used Node 18.18.0 despite `eas.json` configuration
-- **Root Cause:** Running build command from wrong directory (web app instead of mobile app)
-- **Solution:** Ensured command run from correct directory + added `engines` field to package.json
-- Both `eas.json` and `package.json` now specify Node >=20.19.4
-
-**Challenge #2: Apple Privacy Strings Missing**
-- Manual Transporter upload failed with NSCameraUsageDescription error
-- **Root Cause:** TenTap editor and other dependencies reference camera/photo APIs
-- **Solution:** Added privacy descriptions to `app.config.js`:
-  - `NSCameraUsageDescription` - Camera access for adding photos to notes
-  - `NSPhotoLibraryUsageDescription` - Photo library access for images in notes
-  - `NSPhotoLibraryAddUsageDescription` - Permission to save images
-  - `ITSAppUsesNonExemptEncryption` - Declare no custom encryption
-
-**Deployment Process:**
-1. Fixed directory context issue (was in web app directory)
-2. Added Node.js engine requirement to package.json
-3. Added iOS privacy descriptions to app.config.js
-4. Built production IPA via EAS Build
-5. Initially attempted auto-submit (queued 40+ minutes)
-6. Manually submitted via Apple Transporter after adding privacy strings
-7. Successfully uploaded to App Store Connect
-8. Build processed by Apple (~15-30 minutes)
-9. TestFlight distribution enabled
-10. Successfully tested on physical iPhone
-
-**Current State:**
-- ✅ Production build successfully deployed to TestFlight
-- ✅ App tested and working on physical iPhone
-- ✅ EAS Build properly configured with Node 20.19.4
-- ✅ All required Apple privacy descriptions included
-- ✅ Ready for additional tester distribution
-- ✅ Ready for App Store submission when needed
-
-**Files Modified:**
-- `app.config.js` - Added iOS privacy descriptions (NSCamera*, NSPhotoLibrary*)
-- `package.json` - Added `engines: { "node": ">=20.19.4" }` field
-- `eas.json` - Already had Node version specified (commit 5acfee8)
-- Commit: `71377e6` - "Add required iOS privacy descriptions to Info.plist"
-- Commit: `6eb1968` - "Add Node.js engine requirement to package.json"
-
-**Build Information:**
+**Build Info:**
 - **Bundle ID:** `com.anased.wardnotes`
-- **Build Number:** 4
-- **Profile:** production
 - **Distribution:** TestFlight (internal testing)
 - **Node Version:** 20.19.4
-- **Xcode Version:** 15.4 (on EAS Build VM)
-- **Build Time:** ~15-20 minutes (EAS cloud build)
 
-**Lessons Learned:**
-1. **Directory Context Matters:** Always verify you're in the mobile app directory when running EAS commands
-2. **Multiple Node Config Methods:** Specify Node version in both `eas.json` AND `package.json` engines field
-3. **Privacy Strings Required:** Even if app doesn't actively use camera/photos, dependencies may reference APIs requiring descriptions
-4. **Manual Submission Option:** If EAS auto-submit queue is too long, Apple Transporter is a reliable alternative
-5. **Free Tier Queues:** Build queue and submission queue are separate; submission queue can be unpredictably long on free tier
-
-**Future Builds:**
+**Commands:**
 ```bash
-# For TestFlight/App Store production builds
+# Production builds
 npx eas build --platform ios --profile production --auto-submit
 
-# For simulator testing
+# Simulator builds
 npx eas build --profile preview --platform ios
-
-# For local development (requires iOS 18.1 simulator)
-npm run ios
 ```
 
-**TestFlight Distribution:**
-- Access TestFlight builds at: https://appstoreconnect.apple.com
-- Add testers via App Store Connect → TestFlight tab
-- Testers download via TestFlight app on their devices
-- Internal testing group "Team (Expo)" already created
+**Impact:** App available for TestFlight beta testing
 
-**Next Steps for App Store:**
-- Continue testing on TestFlight
-- Gather user feedback and iterate
-- Add app screenshots and metadata
-- Submit for App Store review when ready
+---
 
-### Flashcard Loading Fix & Note Detail UX Improvements (November 2025)
-**Status:** ✅ **RESOLVED** - Infinite loading bug fixed and UI improvements implemented
+### Previous Updates
 
-**What Changed:**
-- Fixed critical infinite loading bug in flashcard hooks
-- Improved Note Detail screen UX by removing unnecessary visual clutter
-- Enhanced content readability with cleaner layout
-- Updated Xcode to 26.1.1 and resolved iOS 26.1 simulator compatibility
+For complete history including:
+- iOS Build Compatibility Issues (November 2024)
+- Flashcard System Implementation (August 2024)
+- And other historical changes
 
-**Technical Details:**
+See [CHANGELOG.md](./CHANGELOG.md) for detailed documentation.
 
-**Issue #1: Infinite Loading in NoteFlashcards Component** (RESOLVED)
-- **Root Cause:** Object dependencies in `useCallback` causing infinite re-render loops
-- **Affected Hooks:** `useFlashcards`, `useDueFlashcards`, `useStudyCards`
-- **Problem:** Passing `filters` object (`{ note_id: noteId }`) as dependency - new object created on every render
-- **Solution:** Convert object to stable string dependency using `JSON.stringify(filters)` as `filtersKey`
-- **Additional Cleanup:** Removed excessive console.log statements from `useDecksWithStats`
+---
 
-**Issue #2: Note Detail Screen UX Clutter** (RESOLVED)
-- **Problem:** Content displayed in bordered white box with redundant "Content:" label
-- **Impact:** Reduced readability, wasted vertical space, visual hierarchy conflict
-- **Solution:** Implemented clean, minimal design following Option 1 approach:
-  - Removed "Content:" label entirely
-  - Removed bordered box styling from content area
-  - Added subtle horizontal divider before flashcards section
-  - Updated TipTapEditor read-only mode: transparent background, no border, adjusted padding
+## Update Guidelines
 
-**Xcode 26.1.1 Compatibility:**
-- Upgraded to macOS 26.1, Xcode 26.1.1, iOS 26.1
-- **Known Issue:** CoreSVG asset catalog compilation bug with Stripe dependencies
-- **Workaround:** Use EAS Build when local builds fail due to asset catalog errors
-- Successfully tested app with iOS 26.1 simulator after installing runtime
-
-**Files Modified:**
-- `src/hooks/useFlashcards.ts` - Fixed infinite loop with stable dependencies (all 3 hooks)
-- `src/hooks/useDecks.ts` - Removed debug logging from `useDecksWithStats`
-- `src/screens/notes/NoteDetailScreen.tsx` - Removed "Content:" label, removed box styling, added divider
-- `src/components/notes/NoteFlashcards.tsx` - Adjusted spacing
-- `src/components/notes/TipTapEditor.tsx` - Updated read-only mode styling for clean display
-- Commit: `00008c5` - "Add flashcards-from-note feature and fix infinite loading issue"
-
-**Before & After:**
-- **Before:** Content in bordered white box with "Content:" label, flashcards showed continuous loading
-- **After:** Content flows naturally on page, proper loading state handling, clean visual separation
-
-**Testing Results:**
-- ✅ Flashcard loading completes successfully (no infinite loops)
-- ✅ Empty state displays correctly ("No flashcards generated yet")
-- ✅ Content displays without unnecessary borders
-- ✅ Improved readability with cleaner layout
-- ✅ Proper visual hierarchy maintained
-
-**Impact:**
-- Significantly improved UX for note viewing
-- Resolved critical infinite loading bug affecting user experience
-- Better content readability and visual flow
-- Maintains consistency with modern mobile design patterns
-
-**Development Notes:**
-- Xcode 26.1.1 CoreSVG bug is Apple toolchain issue, not code issue
-- EAS Build recommended for reliable builds until Apple resolves asset catalog bug
-- Object dependencies in React hooks should always be stabilized with useMemo or string conversion
-
-### Future Update Guidelines
 When adding new features or making significant changes:
 
-1. **Document in this section** with date and brief description
-2. **Include technical details** that affect architecture or major components  
-3. **List modified files** for easy reference
-4. **Note any breaking changes** or migration requirements
-5. **Update relevant sections above** if core architecture changes
+1. **Update Architecture sections** if core implementation changes
+2. **Add brief summary** to Recent Changes (keep it concise)
+3. **Document details** in CHANGELOG.md
+4. **List modified files** for easy reference
+5. **Note breaking changes** or migration requirements
 
-This helps maintain continuity across different Claude Code sessions and provides context for debugging or further development.
+This keeps CLAUDE.md focused on current guidance while maintaining complete history in CHANGELOG.md.

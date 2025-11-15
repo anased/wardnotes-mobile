@@ -1,8 +1,91 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { RichText, useEditorBridge } from '@10play/tentap-editor';
 import { convertTipTapToHtml, convertHtmlToTipTap } from '../../utils/tiptapConverter';
 import EditorKeyboardToolbar from './EditorKeyboardToolbar';
+
+// Mobile-optimized typography CSS
+// Follows iOS Notes app principle: comfortable reading and editing on mobile
+// This CSS is injected into the WebView to provide mobile-appropriate font sizes
+const MOBILE_TYPOGRAPHY_CSS = `
+  /* Mobile-optimized heading sizes */
+  h1, h1 * {
+    font-size: 24px !important;
+    line-height: 1.4 !important;
+    margin-top: 16px !important;
+    margin-bottom: 12px !important;
+  }
+
+  h2, h2 * {
+    font-size: 20px !important;
+    line-height: 1.4 !important;
+    margin-top: 14px !important;
+    margin-bottom: 10px !important;
+  }
+
+  h3, h3 * {
+    font-size: 18px !important;
+    line-height: 1.4 !important;
+    margin-top: 12px !important;
+    margin-bottom: 8px !important;
+  }
+
+  h4 {
+    font-size: 17px !important;
+    line-height: 1.4 !important;
+  }
+
+  h5, h6 {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Body text - optimal for mobile reading */
+  p {
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Lists - tighter spacing for mobile */
+  ul, ol {
+    margin-top: 8px !important;
+    margin-bottom: 12px !important;
+    padding-left: 24px !important;
+  }
+
+  li {
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* Blockquotes */
+  blockquote {
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    margin: 12px 0 !important;
+    padding-left: 12px !important;
+  }
+
+  /* Code blocks */
+  pre {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+    padding: 12px !important;
+    margin: 12px 0 !important;
+  }
+
+  code {
+    font-size: 14px !important;
+  }
+
+  /* Disable text size adjustment for consistent rendering */
+  body {
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
+`;
 
 interface TipTapEditorProps {
   initialContent?: any;
@@ -24,7 +107,7 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
   placeholder = 'Start writing your medical note...',
   showToolbar = true,
 }, ref) => {
-  const contentUpdateRef = useRef<number | null>(null);
+  const contentUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const lastContentRef = useRef<string>('');
 
   // Function to manually check and update content
@@ -93,7 +176,6 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
     avoidIosKeyboard: false,
     initialContent: initialHtmlContent || '',
     editable: editable,
-    // Note: placeholder may not be supported by this version of tentap-editor
   });
 
   useEffect(() => {
@@ -148,6 +230,28 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
       editor.setEditable(editable);
     }
   }, [editor, editable]);
+
+  // Inject mobile-optimized typography CSS once when editor initializes
+  useEffect(() => {
+    if (!editor) return;
+
+    const setupMobileTypography = async () => {
+      try {
+        // Wait for editor to be ready
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Inject mobile typography CSS once
+        // This is the proper way to configure WebView styles for mobile
+        editor.injectCSS(MOBILE_TYPOGRAPHY_CSS, 'mobile-typography');
+
+        console.log('✅ Mobile typography configured');
+      } catch (error: any) {
+        console.error('Error configuring mobile typography:', error);
+      }
+    };
+
+    setupMobileTypography();
+  }, [editor]);
 
   // Monitor content changes using polling
   useEffect(() => {

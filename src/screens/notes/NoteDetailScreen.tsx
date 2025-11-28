@@ -14,142 +14,12 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { Ionicons } from '@expo/vector-icons';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
-import TipTapEditor from '../../components/notes/TipTapEditor';
+import NativeNoteRenderer from '../../components/notes/NativeNoteRenderer';
 import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
+import NoteFlashcards from '../../components/notes/NoteFlashcards';
+import FlashcardGeneratorModal from '../../components/flashcards/FlashcardGeneratorModal';
 import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
 import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
-
-// Helper function to convert content to HTML
-const getContentAsHtml = (content: any): string => {
-  console.log('Raw content:', content);
-  
-  if (!content) {
-    return '';
-  }
-
-  // If it's already a string, return it
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  // If it has an html property, use that
-  if (content.html && typeof content.html === 'string') {
-    return content.html;
-  }
-
-  // If it's a TipTap JSON structure
-  if (content.type === 'doc' && content.content) {
-    let html = '';
-    content.content.forEach((node: any) => {
-      if (node.type === 'paragraph') {
-        html += '<p>';
-        if (node.content) {
-          node.content.forEach((textNode: any) => {
-            if (textNode.text) {
-              let text = textNode.text;
-              
-              // Apply marks (bold, italic, etc.)
-              if (textNode.marks) {
-                textNode.marks.forEach((mark: any) => {
-                  if (mark.type === 'bold') {
-                    text = `<strong>${text}</strong>`;
-                  } else if (mark.type === 'italic') {
-                    text = `<em>${text}</em>`;
-                  } else if (mark.type === 'underline') {
-                    text = `<u>${text}</u>`;
-                  }
-                });
-              }
-              
-              html += text;
-            }
-          });
-        }
-        html += '</p>';
-      } else if (node.type === 'heading' && node.content) {
-        const level = node.attrs?.level || 1;
-        html += `<h${level}>`;
-        node.content.forEach((textNode: any) => {
-          if (textNode.text) {
-            html += textNode.text;
-          }
-        });
-        html += `</h${level}>`;
-      } else if (node.type === 'bulletList' && node.content) {
-        html += '<ul>';
-        node.content.forEach((listItem: any) => {
-          if (listItem.type === 'listItem' && listItem.content) {
-            html += '<li>';
-            listItem.content.forEach((paragraph: any) => {
-              if (paragraph.content) {
-                paragraph.content.forEach((textNode: any) => {
-                  if (textNode.text) {
-                    html += textNode.text;
-                  }
-                });
-              }
-            });
-            html += '</li>';
-          }
-        });
-        html += '</ul>';
-      } else if (node.type === 'orderedList' && node.content) {
-        html += '<ol>';
-        node.content.forEach((listItem: any) => {
-          if (listItem.type === 'listItem' && listItem.content) {
-            html += '<li>';
-            listItem.content.forEach((paragraph: any) => {
-              if (paragraph.content) {
-                paragraph.content.forEach((textNode: any) => {
-                  if (textNode.text) {
-                    html += textNode.text;
-                  }
-                });
-              }
-            });
-            html += '</li>';
-          }
-        });
-        html += '</ol>';
-      }
-    });
-    return html;
-  }
-
-  // If it's a simple object with text content, try to extract it
-  if (typeof content === 'object') {
-    // Try to find text content recursively
-    const extractText = (obj: any): string => {
-      if (typeof obj === 'string') return obj;
-      if (Array.isArray(obj)) {
-        return obj.map(extractText).join(' ');
-      }
-      if (obj && typeof obj === 'object') {
-        if (obj.text) return obj.text;
-        return Object.values(obj).map(extractText).join(' ');
-      }
-      return '';
-    };
-    
-    const extractedText = extractText(content);
-    if (extractedText.trim()) {
-      // Convert plain text to HTML paragraphs
-      return extractedText
-        .split('\n\n')
-        .filter(p => p.trim())
-        .map(p => `<p>${p.trim()}</p>`)
-        .join('');
-    }
-  }
-
-  // Fallback: convert to string and wrap in paragraph
-  const fallbackText = String(content);
-  if (fallbackText && fallbackText !== '[object Object]') {
-    return `<p>${fallbackText}</p>`;
-  }
-
-  return '';
-};
 
 export default function NoteDetailScreen() {
   const navigation = useNavigation<CombinedNavigationProp>();
@@ -161,6 +31,7 @@ export default function NoteDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [isWebOnlyNote, setIsWebOnlyNote] = useState(false);
+  const [showFlashcardGenerator, setShowFlashcardGenerator] = useState(false);
 
   const { fetchNoteById, removeNote } = useNotes();
   const { categories } = useCategories();
@@ -237,7 +108,16 @@ export default function NoteDetailScreen() {
   };
 
   const handleGenerateFlashcards = () => {
-    Alert.alert('Coming Soon', 'Flashcard generation will be available in the premium version');
+    setShowFlashcardGenerator(true);
+  };
+
+  const handleFlashcardGeneratorClose = () => {
+    setShowFlashcardGenerator(false);
+  };
+
+  const handleFlashcardGenerationSuccess = () => {
+    // Reload the note to refresh the flashcards section
+    loadNote();
   };
 
   const formatDate = (dateString: string) => {
@@ -326,9 +206,6 @@ export default function NoteDetailScreen() {
     );
   }
 
-  // Use TipTap content directly for display
-  console.log('TipTap content:', note.content);
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -410,15 +287,8 @@ export default function NoteDetailScreen() {
         )}
 
         <View style={styles.contentContainer}>
-          <Text style={styles.contentLabel}>Content:</Text>
           {note.content ? (
-            <View style={styles.editorContainer}>
-              <TipTapEditor
-                initialContent={note.content}
-                onContentChange={() => {}}
-                editable={false}
-              />
-            </View>
+            <NativeNoteRenderer content={note.content} />
           ) : (
             <View style={styles.noContentContainer}>
               <Ionicons name="document-outline" size={48} color="#d1d5db" />
@@ -429,7 +299,19 @@ export default function NoteDetailScreen() {
             </View>
           )}
         </View>
+        <View style={styles.divider} />
+
+        <NoteFlashcards noteId={noteId} />
       </ScrollView>
+
+      {/* Flashcard Generator Modal */}
+      <FlashcardGeneratorModal
+        visible={showFlashcardGenerator}
+        noteId={noteId}
+        noteTitle={note?.title || ''}
+        onClose={handleFlashcardGeneratorClose}
+        onSuccess={handleFlashcardGenerationSuccess}
+      />
     </SafeAreaView>
   );
 }
@@ -541,20 +423,12 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   contentContainer: {
-    flex: 1,
+    marginBottom: 24,
   },
-  contentLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  editorContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    minHeight: 300,
+  divider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 24,
   },
   noContentContainer: {
     backgroundColor: 'white',

@@ -1,5 +1,5 @@
 // src/screens/notes/EditNoteScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,16 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { Toolbar } from '@10play/tentap-editor';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
@@ -161,8 +163,11 @@ export default function EditNoteScreen() {
   const route = useRoute<EditNoteRouteProp>();
   const { noteId } = route.params;
 
+  // For keyboard offset calculation
+  const { top } = useSafeAreaInsets();
+  const keyboardVerticalOffset = Platform.OS === 'ios' ? top : 0;
+
   const [note, setNote] = useState<any>(null);
-  const editorRef = useRef<TipTapEditorRef>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState<any>(null);
   const [category, setCategory] = useState('');
@@ -171,10 +176,11 @@ export default function EditNoteScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isWebOnlyNote, setIsWebOnlyNote] = useState(false);
+  const editorRef = React.useRef<TipTapEditorRef>(null);
 
   const { fetchNoteById, editNote } = useNotes();
   const { categories, addCategory } = useCategories();
-  const { tags: availableTags } = useTags();
+  const { tags: availableTags, addTag } = useTags();
 
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -224,8 +230,8 @@ export default function EditNoteScreen() {
         return; // Don't continue loading the edit interface
       }
       
-      // Use TipTap content directly - no conversion needed!
-      console.log('Loading TipTap content directly:', noteData.content);
+      // TipTap content - ready to use
+      console.log('Loading TipTap content:', noteData.content);
       setContent(noteData.content);
       
       setCategory(noteData.category);
@@ -239,24 +245,46 @@ export default function EditNoteScreen() {
     }
   };
 
-  const handleSave = async () => {
-    console.error('🔥 HANDLE SAVE CALLED');
+  // Ensure tags exist in database (create if needed)
+  const ensureTagsExist = async (tagArray: string[]) => {
     try {
-      console.error('🔥 INSIDE TRY BLOCK');
-      console.log('🟢 === SAVE BUTTON PRESSED ===');
-      
-      // Force content synchronization from editor before saving
-      let finalContent = content;
-      if (editorRef.current) {
-        console.log('🔄 Forcing content update from editor...');
-        await editorRef.current.forceContentUpdate();
-        // Get the latest content directly from editor
-        const latestContent = await editorRef.current.getCurrentContent();
-        if (latestContent) {
-          finalContent = latestContent;
-          console.log('✓ Got latest content from editor:', finalContent);
+      // Get existing tag names (case-insensitive)
+      const existingTagNames = availableTags.map(tag => tag.name.toLowerCase());
+
+      // Find new tags that don't exist yet
+      const newTagNames = tagArray.filter(
+        tag => !existingTagNames.includes(tag.toLowerCase())
+      );
+
+      // Create new tags in database
+      for (const newTagName of newTagNames) {
+        try {
+          await addTag(newTagName);
+        } catch (err) {
+          // Ignore duplicate errors (race condition or already exists)
+          console.warn(`Tag creation skipped for "${newTagName}":`, err);
         }
       }
+    } catch (err) {
+      console.error('Error ensuring tags exist:', err);
+      // Don't throw - we still want to save the note even if tag creation fails
+    }
+  };
+
+  const handleSave = async () => {
+    console.log('🔥 HANDLE SAVE CALLED');
+    try {
+      console.log('🟢 === SAVE BUTTON PRESSED ===');
+
+      // Get current content from editor via ref
+      let currentContent = content;
+      if (editorRef.current) {
+        await editorRef.current.forceContentUpdate();
+        currentContent = await editorRef.current.getCurrentContent();
+      }
+      console.log('Current editor content:', currentContent);
+
+      let finalContent = currentContent;
       
       console.log('🟢 Final content to save:', finalContent);
       console.log('🟢 Content type:', typeof finalContent);
@@ -286,6 +314,9 @@ export default function EditNoteScreen() {
         .split(',')
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
+
+      // Ensure tags exist in database before saving note
+      await ensureTagsExist(tagArray);
 
       // Use the final content from editor
       const contentToSave = finalContent || {
@@ -410,17 +441,14 @@ export default function EditNoteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
+      <View style={styles.content}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
-          
+
           <Text style={styles.headerTitle}>Edit Note</Text>
-          
+
           <TouchableOpacity
             onPress={() => {
               console.error('🔴 BUTTON CLICKED!');
@@ -439,7 +467,13 @@ export default function EditNoteScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
+          keyboardDismissMode="interactive"
+        >
           <TextInput
             style={styles.titleInput}
             placeholder="Enter note title..."
@@ -490,55 +524,28 @@ export default function EditNoteScreen() {
           <View style={styles.editorContainer}>
             <Text style={styles.label}>Content</Text>
             <TipTapEditor
-              key={noteId} // Use noteId as key to prevent unnecessary remounts
               initialContent={content}
               ref={editorRef}
               onContentChange={(newContent) => {
-                console.log('=== CONTENT CHANGE CALLBACK ===');
-                console.log('New content received:', newContent);
-                console.log('New content type:', typeof newContent);
-                
-                // Handle content updates synchronously to ensure state consistency
-                if (typeof newContent === 'string') {
-                  console.log('Received HTML content, converting to TipTap...');
-                  try {
-                    const { convertHtmlToTipTap } = require('../../utils/tiptapConverter');
-                    const tipTapContent = convertHtmlToTipTap(newContent);
-                    console.log('Converted to TipTap:', JSON.stringify(tipTapContent, null, 2));
-                    setContent(tipTapContent);
-                  } catch (error: any) {
-                    console.error('Error converting HTML to TipTap:', error);
-                    // Fallback: create a simple TipTap structure with the HTML content
-                    const fallbackContent = {
-                      type: 'doc',
-                      content: [{
-                        type: 'paragraph',
-                        content: [{ type: 'text', text: newContent.replace(/<[^>]*>/g, '') }]
-                      }]
-                    };
-                    console.log('Using fallback content:', JSON.stringify(fallbackContent, null, 2));
-                    setContent(fallbackContent);
-                  }
-                } else if (newContent && typeof newContent === 'object') {
-                  console.log('Received TipTap content directly');
-                  setContent(newContent);
-                } else {
-                  console.log('Received invalid content, using fallback');
-                  const fallbackContent = {
-                    type: 'doc',
-                    content: [{
-                      type: 'paragraph',
-                      content: [{ type: 'text', text: String(newContent || '') }]
-                    }]
-                  };
-                  setContent(fallbackContent);
-                }
-                console.log('✓ Content state updated successfully');
+                console.log('📝 Content changed in editor:', newContent);
+                setContent(newContent);
               }}
               editable={true}
+              renderToolbarExternally={true}
             />
           </View>
         </ScrollView>
+
+        {/* Toolbar positioned outside ScrollView following official 10tap-editor pattern */}
+        {editorRef.current && content && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={keyboardVerticalOffset}
+            style={styles.toolbarKeyboardAvoidingView}
+          >
+            <Toolbar editor={editorRef.current.getEditorBridge()} />
+          </KeyboardAvoidingView>
+        )}
 
         {/* Category Creation Modal */}
         {showCategoryModal && (
@@ -600,7 +607,7 @@ export default function EditNoteScreen() {
             </View>
           </Modal>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -610,7 +617,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  keyboardView: {
+  content: {
     flex: 1,
   },
   header: {
@@ -645,9 +652,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  content: {
+  keyboardAvoidingView: {
     flex: 1,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
     padding: 15,
+    paddingBottom: 30,
   },
   titleInput: {
     fontSize: 20,
@@ -812,7 +825,35 @@ const styles = StyleSheet.create({
   },
   editorContainer: {
     flex: 1,
+    minHeight: 400,
+    marginBottom: 20,
+  },
+  richTextContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    minHeight: 400,
+  },
+  richTextEditor: {
+    flex: 1,
+    padding: 16,
+  },
+  editorLoadingContainer: {
+    flex: 1,
     minHeight: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  editorLoadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
   },
   centerContainer: {
     flex: 1,
@@ -920,5 +961,15 @@ const styles = StyleSheet.create({
   createModalButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  // Toolbar positioning - following official 10tap-editor pattern
+  toolbarKeyboardAvoidingView: {
+    position: 'absolute',
+    width: '100%',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    pointerEvents: 'box-none', // Allow touches to pass through to content below
   },
 });

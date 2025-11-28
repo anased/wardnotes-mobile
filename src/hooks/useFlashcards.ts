@@ -15,6 +15,9 @@ export const useFlashcards = (filters?: FlashcardSearchFilters) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Stringify filters to create a stable dependency
+  const filtersKey = JSON.stringify(filters);
+
   const loadFlashcards = useCallback(async () => {
     try {
       setLoading(true);
@@ -26,7 +29,7 @@ export const useFlashcards = (filters?: FlashcardSearchFilters) => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filtersKey]);
 
   const createFlashcard = useCallback(async (request: CreateFlashcardRequest): Promise<Flashcard> => {
     try {
@@ -104,6 +107,9 @@ export const useDueFlashcards = (deckId?: string, limit?: number) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Create stable key for dependencies
+  const depsKey = `${deckId}-${limit}`;
+
   const loadDueCards = useCallback(async () => {
     try {
       setLoading(true);
@@ -115,7 +121,7 @@ export const useDueFlashcards = (deckId?: string, limit?: number) => {
     } finally {
       setLoading(false);
     }
-  }, [deckId, limit]);
+  }, [depsKey]);
 
   const submitReview = useCallback(async (flashcardId: string, quality: ReviewQuality, responseTime?: number): Promise<void> => {
     try {
@@ -152,6 +158,9 @@ export const useStudyCards = (deckId?: string, maxDue: number = 30, maxNew: numb
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Create stable key for dependencies
+  const depsKey = `${deckId}-${maxDue}-${maxNew}`;
+
   const loadStudyCards = useCallback(async () => {
     try {
       setLoading(true);
@@ -163,7 +172,7 @@ export const useStudyCards = (deckId?: string, maxDue: number = 30, maxNew: numb
     } finally {
       setLoading(false);
     }
-  }, [deckId, maxDue, maxNew]);
+  }, [depsKey]);
 
   const submitReview = useCallback(async (flashcardId: string, quality: ReviewQuality, responseTime?: number): Promise<void> => {
     try {

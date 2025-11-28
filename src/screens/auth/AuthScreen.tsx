@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
+import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
 
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
@@ -155,11 +156,19 @@ export default function AuthScreen() {
               disabled={loading}
             >
               <Text style={styles.switchText}>
-                {isSignUp 
-                  ? 'Already have an account? Sign In' 
+                {isSignUp
+                  ? 'Already have an account? Sign In'
                   : "Don't have an account? Create Account"}
               </Text>
             </TouchableOpacity>
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <GoogleLoginButton />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -244,5 +253,20 @@ const styles = StyleSheet.create({
     color: '#0ea5e9',
     fontSize: 14,
     fontWeight: '500',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#d1d5db',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#6b7280',
   },
 });

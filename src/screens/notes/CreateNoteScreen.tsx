@@ -12,9 +12,10 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { Toolbar } from '@10play/tentap-editor';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
@@ -154,6 +155,10 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
 };
 
 export default function CreateNoteScreen() {
+  // For keyboard offset calculation
+  const { top } = useSafeAreaInsets();
+  const keyboardVerticalOffset = Platform.OS === 'ios' ? top : 0;
+
   const [title, setTitle] = useState('');
   const [content, setContent] = useState<any>(null);
   const editorRef = useRef<TipTapEditorRef>(null);
@@ -166,7 +171,7 @@ export default function CreateNoteScreen() {
 
   const { addNote } = useNotes();
   const { categories, addCategory, loading: categoriesLoading } = useCategories();
-  const { tags: availableTags } = useTags();
+  const { tags: availableTags, addTag } = useTags();
   const navigation = useNavigation();
 
   const colorOptions = [
@@ -217,6 +222,32 @@ export default function CreateNoteScreen() {
     }
   }, [categories, category]);
 
+  // Ensure tags exist in database (create if needed)
+  const ensureTagsExist = async (tagArray: string[]) => {
+    try {
+      // Get existing tag names (case-insensitive)
+      const existingTagNames = availableTags.map(tag => tag.name.toLowerCase());
+
+      // Find new tags that don't exist yet
+      const newTagNames = tagArray.filter(
+        tag => !existingTagNames.includes(tag.toLowerCase())
+      );
+
+      // Create new tags in database
+      for (const newTagName of newTagNames) {
+        try {
+          await addTag(newTagName);
+        } catch (err) {
+          // Ignore duplicate errors (race condition or already exists)
+          console.warn(`Tag creation skipped for "${newTagName}":`, err);
+        }
+      }
+    } catch (err) {
+      console.error('Error ensuring tags exist:', err);
+      // Don't throw - we still want to save the note even if tag creation fails
+    }
+  };
+
   const handleSave = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a title');
@@ -234,6 +265,9 @@ export default function CreateNoteScreen() {
         .split(',')
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
+
+      // Ensure tags exist in database before saving note
+      await ensureTagsExist(tagArray);
 
       // Force content synchronization from editor before saving (similar to EditNoteScreen)
       let finalContent = content;
@@ -301,60 +335,6 @@ export default function CreateNoteScreen() {
     }
   };
 
-  const insertTemplate = (templateType: string) => {
-    let tipTapContent: any;
-    
-    switch (templateType) {
-      case 'soap':
-        tipTapContent = {
-          type: 'doc',
-          content: [
-            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Subjective' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: '' }] },
-            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Objective' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: '' }] },
-            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Assessment' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: '' }] },
-            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Plan' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: '' }] }
-          ]
-        };
-        break;
-      case 'physical':
-        tipTapContent = {
-          type: 'doc',
-          content: [
-            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Physical Examination' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Vitals:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'General:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'HEENT:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Cardiovascular:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Respiratory:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Abdominal:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Extremities:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Neurological:', marks: [{ type: 'bold' }] }] }
-          ]
-        };
-        break;
-      case 'procedure':
-        tipTapContent = {
-          type: 'doc',
-          content: [
-            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Procedure Note' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Indication:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Procedure:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Technique:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Findings:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Complications:', marks: [{ type: 'bold' }] }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'Post-procedure care:', marks: [{ type: 'bold' }] }] }
-          ]
-        };
-        break;
-    }
-    
-    console.log('📝 Inserting template:', templateType, tipTapContent);
-    setContent(tipTapContent);
-  };
 
   const getTagSuggestions = () => {
     const currentTags = tags.split(',').map(t => t.trim()).filter(Boolean);
@@ -380,10 +360,7 @@ export default function CreateNoteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
+      <View style={styles.content}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.cancelButton}>Cancel</Text>
@@ -402,11 +379,12 @@ export default function CreateNoteScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          style={styles.content} 
-          contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={styles.scrollContent}
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
+          keyboardDismissMode="interactive"
         >
           <TextInput
             style={styles.titleInput}
@@ -462,31 +440,6 @@ export default function CreateNoteScreen() {
             )}
           </View>
 
-          {/* Template buttons */}
-          <View style={styles.templatesContainer}>
-            <Text style={styles.label}>Quick Templates</Text>
-            <View style={styles.templatesRow}>
-              <TouchableOpacity
-                style={styles.templateButton}
-                onPress={() => insertTemplate('soap')}
-              >
-                <Text style={styles.templateButtonText}>SOAP Note</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.templateButton}
-                onPress={() => insertTemplate('physical')}
-              >
-                <Text style={styles.templateButtonText}>Physical Exam</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.templateButton}
-                onPress={() => insertTemplate('procedure')}
-              >
-                <Text style={styles.templateButtonText}>Procedure</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
           <View style={styles.editorContainer}>
             <Text style={styles.label}>Content</Text>
             <TipTapEditor
@@ -499,9 +452,21 @@ export default function CreateNoteScreen() {
                 setContent(newContent);
               }}
               editable={true}
+              renderToolbarExternally={true}
             />
           </View>
         </ScrollView>
+
+        {/* Toolbar positioned outside ScrollView following official 10tap-editor pattern */}
+        {editorRef.current && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={keyboardVerticalOffset}
+            style={styles.toolbarKeyboardAvoidingView}
+          >
+            <Toolbar editor={editorRef.current.getEditorBridge()} />
+          </KeyboardAvoidingView>
+        )}
 
         {/* Category Creation Modal */}
         {showCategoryModal && (
@@ -563,7 +528,7 @@ export default function CreateNoteScreen() {
             </View>
           </Modal>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -573,7 +538,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  keyboardView: {
+  content: {
     flex: 1,
   },
   header: {
@@ -608,12 +573,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  content: {
+  scrollContent: {
     flex: 1,
   },
-  scrollContent: {
+  scrollContentContainer: {
     padding: 15,
-    paddingBottom: 20,
+    paddingBottom: 30,
   },
   titleInput: {
     fontSize: 20,
@@ -788,30 +753,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#0ea5e9',
   },
-  templatesContainer: {
-    marginBottom: 15,
-  },
-  templatesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  templateButton: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  templateButtonText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
   editorContainer: {
     flex: 1,
-    minHeight: 300,
+    minHeight: 400,
+    marginBottom: 20,
   },
   // Modal styles
   modalOverlay: {
@@ -891,5 +836,15 @@ const styles = StyleSheet.create({
   createModalButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  // Toolbar positioning - following official 10tap-editor pattern
+  toolbarKeyboardAvoidingView: {
+    position: 'absolute',
+    width: '100%',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    pointerEvents: 'box-none', // Allow touches to pass through to content below
   },
 });

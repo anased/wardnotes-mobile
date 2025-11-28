@@ -12,9 +12,10 @@ export type RootStackParamList = {
   Auth: undefined;
   Loading: undefined;
   NotificationSettings: undefined;
+  Subscription: undefined;
   // Flashcard screens
   DeckScreen: { deckId: string };
-  StudyScreen: { deckId: string; mode?: 'new' | 'review' | 'mixed' };
+  StudyScreen: { deckId?: string; noteId?: string; mode?: 'new' | 'review' | 'mixed' };
   CreateCard: { deckId?: string };
 };
 

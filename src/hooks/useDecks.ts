@@ -156,20 +156,16 @@ export const useDecksWithStats = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('useDecksWithStats: Starting to load decks...');
-      
+
       const decks = await FlashcardService.getDecks();
-      console.log('useDecksWithStats: Loaded decks count:', decks.length);
-      console.log('useDecksWithStats: Loaded decks data:', JSON.stringify(decks, null, 2));
-      
+
       // Load stats for each deck
       const decksWithStatsPromises = decks.map(async (deck) => {
         const stats = await FlashcardService.getDeckStats(deck.id);
         return { ...deck, stats };
       });
-      
+
       const data = await Promise.all(decksWithStatsPromises);
-      console.log('useDecksWithStats: Final data with stats:', data);
       setDecksWithStats(data);
     } catch (err) {
       console.error('useDecksWithStats: Error loading decks:', err);

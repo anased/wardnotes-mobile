@@ -14,6 +14,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDeck, useDeckStats } from '../../hooks/useDecks';
 import { useFlashcards } from '../../hooks/useFlashcards';
 import { FlashcardService } from '../../services/flashcardService';
+import FlashcardListModal from '../../components/flashcards/FlashcardListModal';
 import type { DeckScreenRouteProp, MainTabNavigationProp } from '../../types/navigation';
 
 export default function DeckScreen() {
@@ -30,6 +31,7 @@ export default function DeckScreen() {
   } = useFlashcards({ deck_id: deckId });
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showFlashcardListModal, setShowFlashcardListModal] = useState(false);
 
   const handleRefresh = async () => {
     await Promise.all([refreshDeck(), refreshStats(), refreshCards()]);
@@ -207,14 +209,26 @@ export default function DeckScreen() {
         {/* Card List Preview */}
         {flashcards.length > 0 && (
           <View style={styles.cardPreview}>
-            <Text style={styles.sectionTitle}>
-              Recent Cards ({flashcards.length})
-            </Text>
+            <View style={styles.cardPreviewHeader}>
+              <Text style={styles.sectionTitle}>
+                Recent Cards ({flashcards.length})
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowFlashcardListModal(true)}
+                style={styles.viewAllButton}
+              >
+                <Text style={styles.viewAllButtonText}>View All</Text>
+              </TouchableOpacity>
+            </View>
             {flashcards.slice(0, 5).map((card) => (
-              <View key={card.id} style={styles.cardItem}>
+              <TouchableOpacity
+                key={card.id}
+                style={styles.cardItem}
+                onPress={() => setShowFlashcardListModal(true)}
+              >
                 <Text style={styles.cardContent} numberOfLines={2}>
-                  {card.card_type === 'front_back' 
-                    ? card.front_content 
+                  {card.card_type === 'front_back'
+                    ? card.front_content
                     : card.cloze_content?.replace(/\{\{c\d+::(.*?)(?:::.*?)?\}\}/g, '$1')
                   }
                 </Text>
@@ -222,11 +236,19 @@ export default function DeckScreen() {
                   <Text style={styles.cardType}>{card.card_type}</Text>
                   <Text style={styles.cardStatus}>{card.status}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
       </ScrollView>
+
+      {/* Flashcard List Modal */}
+      <FlashcardListModal
+        visible={showFlashcardListModal}
+        deckId={deckId}
+        onClose={() => setShowFlashcardListModal(false)}
+        onFlashcardUpdated={handleRefresh}
+      />
     </SafeAreaView>
   );
 }
@@ -348,6 +370,23 @@ const styles = StyleSheet.create({
   },
   cardPreview: {
     margin: 16,
+  },
+  cardPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#eff6ff',
+    borderRadius: 6,
+  },
+  viewAllButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0ea5e9',
   },
   cardItem: {
     backgroundColor: '#ffffff',

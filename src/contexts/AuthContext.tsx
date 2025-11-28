@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '../services/supabase/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
 
 interface User {
   id: string;
@@ -24,6 +25,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null }>;
   signUp: (email: string, password: string) => Promise<{ user: User | null; session: Session | null }>;
+  signInWithOAuth: (session: Session) => Promise<{ user: User | null; session: Session | null }>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -190,7 +192,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
-      
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -219,13 +221,52 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const signInWithOAuth = async (oauthSession: Session) => {
+    try {
+      setLoading(true);
+
+      // Fetch user data using the access token
+      const response = await fetch(`${supabase.supabaseUrl}/auth/v1/user`, {
+        headers: {
+          'apikey': supabase.supabaseKey,
+          'Authorization': `Bearer ${oauthSession.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+
+      const userData = await response.json();
+
+      // Create complete session with user data
+      const completeSession: Session = {
+        ...oauthSession,
+        user: userData,
+      };
+
+      // Store session
+      await updateAuthState(completeSession);
+
+      return { user: userData, session: completeSession };
+    } catch (error) {
+      console.error('OAuth sign in error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signOut = async () => {
     try {
       setLoading(true);
-      
+
       // Sign out from Supabase
       await supabase.auth.signOut();
-      
+
+      // Clear browser auth session (clears Google OAuth cookies)
+      await WebBrowser.maybeCompleteAuthSession();
+
       // Clear local state
       await clearAuthState();
     } catch (error) {
@@ -249,6 +290,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     loading,
     signIn,
     signUp,
+    signInWithOAuth,
     signOut,
     refreshSession,
   };

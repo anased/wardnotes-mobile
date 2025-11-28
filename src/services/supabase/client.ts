@@ -64,23 +64,23 @@ class SupabaseRestClient {
           headers: this.headers,
           body: JSON.stringify({ email, password }),
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
           return { data: { user: null, session: null }, error: data };
         }
-        
+
         const session = {
           access_token: data.access_token,
           refresh_token: data.refresh_token,
           user: data.user,
           expires_at: data.expires_at,
         };
-        
+
         // Don't store here - let AuthContext handle it
         this.updateHeaders(data.access_token);
-        
+
         return { data: { user: data.user, session }, error: null };
       } catch (error) {
         return { data: { user: null, session: null }, error };
@@ -94,13 +94,13 @@ class SupabaseRestClient {
           headers: this.headers,
           body: JSON.stringify({ email, password }),
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
           return { data: { user: null, session: null }, error: data };
         }
-        
+
         return { data: { user: data.user, session: data.session }, error: null };
       } catch (error) {
         return { data: { user: null, session: null }, error };
@@ -114,13 +114,63 @@ class SupabaseRestClient {
           method: 'POST',
           headers: this.headers,
         });
-        
+
         // Reset headers
         this.updateHeaders(null);
-        
+
         return { error: null };
       } catch (error) {
         return { error };
+      }
+    },
+
+    // OAuth method for Google Sign-In
+    signInWithOAuth: (provider: string, redirectTo: string) => {
+      // Return OAuth URL - the actual OAuth flow will be handled by expo-auth-session
+      // Query parameters to pass to Google OAuth:
+      // - prompt=select_account: Forces account picker to show every time
+      // - access_type=offline: Request a refresh token
+      const queryParams = new URLSearchParams({
+        provider: provider,
+        redirect_to: redirectTo,
+        // These get passed to the OAuth provider (Google)
+        prompt: 'select_account',
+        access_type: 'offline',
+      });
+
+      return {
+        url: `${this.supabaseUrl}/auth/v1/authorize?${queryParams.toString()}`,
+      };
+    },
+
+    // Exchange OAuth code for session
+    exchangeCodeForSession: async (code: string) => {
+      try {
+        const response = await fetch(`${this.supabaseUrl}/auth/v1/token?grant_type=authorization_code`, {
+          method: 'POST',
+          headers: this.headers,
+          body: JSON.stringify({ auth_code: code }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return { data: { user: null, session: null }, error: data };
+        }
+
+        const session = {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          user: data.user,
+          expires_at: data.expires_at,
+        };
+
+        // Update headers with new token
+        this.updateHeaders(data.access_token);
+
+        return { data: { user: data.user, session }, error: null };
+      } catch (error) {
+        return { data: { user: null, session: null }, error };
       }
     },
   };
@@ -690,11 +740,13 @@ export const getTags = async () => {
 
 export const createTag = async (name: string) => {
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) {
     throw new Error('User not authenticated');
   }
-  
+
+  // Custom REST client's insert() already returns data (has 'Prefer': 'return=representation')
+  // No .select() needed - insert() returns a Promise directly
   const result = await supabase
     .from('tags')
     .insert({
@@ -706,7 +758,7 @@ export const createTag = async (name: string) => {
     console.error('Error creating tag:', result.error);
     throw result.error;
   }
-  
+
   if (!result.data || result.data.length === 0) {
     throw new Error('Failed to create tag - no data returned');
   }

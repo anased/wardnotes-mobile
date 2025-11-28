@@ -1,50 +1,80 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { RichText, useEditorBridge } from '@10play/tentap-editor';
-import { convertTipTapToHtml, convertHtmlToTipTap } from '../../utils/tiptapConverter';
-import EditorKeyboardToolbar from './EditorKeyboardToolbar';
+import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { RichText, Toolbar, useEditorBridge } from '@10play/tentap-editor';
+import { convertTipTapToHtml } from '../../utils/tiptapConverter';
 
 // Mobile-optimized typography CSS
-// Follows iOS Notes app principle: comfortable reading and editing on mobile
-// This CSS is injected into the WebView to provide mobile-appropriate font sizes
+// Matches the native NativeNoteRenderer styles exactly for consistency
+// This CSS is injected into the WebView to provide iOS Notes-like appearance
 const MOBILE_TYPOGRAPHY_CSS = `
-  /* Mobile-optimized heading sizes */
+  /* Base body styles - match iOS system font */
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    color: #1f2937 !important;
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Mobile-optimized heading sizes - match native exactly */
   h1, h1 * {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 24px !important;
+    font-weight: 700 !important;
     line-height: 1.4 !important;
     margin-top: 16px !important;
     margin-bottom: 12px !important;
+    color: #1f2937 !important;
   }
 
   h2, h2 * {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 20px !important;
+    font-weight: 700 !important;
     line-height: 1.4 !important;
     margin-top: 14px !important;
     margin-bottom: 10px !important;
+    color: #1f2937 !important;
   }
 
   h3, h3 * {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 18px !important;
+    font-weight: 700 !important;
     line-height: 1.4 !important;
     margin-top: 12px !important;
     margin-bottom: 8px !important;
+    color: #1f2937 !important;
   }
 
   h4 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 17px !important;
+    font-weight: 600 !important;
     line-height: 1.4 !important;
+    margin-top: 10px !important;
+    margin-bottom: 6px !important;
+    color: #1f2937 !important;
   }
 
   h5, h6 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 16px !important;
+    font-weight: 600 !important;
     line-height: 1.4 !important;
+    margin-top: 8px !important;
+    margin-bottom: 6px !important;
+    color: #1f2937 !important;
   }
 
   /* Body text - optimal for mobile reading */
   p {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
     margin-bottom: 12px !important;
+    color: #1f2937 !important;
   }
 
   /* Lists - tighter spacing for mobile */
@@ -55,35 +85,57 @@ const MOBILE_TYPOGRAPHY_CSS = `
   }
 
   li {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
     margin-bottom: 4px !important;
+    color: #1f2937 !important;
   }
 
   /* Blockquotes */
   blockquote {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
     margin: 12px 0 !important;
     padding-left: 12px !important;
+    color: #6b7280 !important;
+    font-style: italic !important;
+    border-left: 3px solid #d1d5db !important;
   }
 
   /* Code blocks */
   pre {
+    font-family: "Courier New", Courier, monospace !important;
     font-size: 14px !important;
     line-height: 1.4 !important;
     padding: 12px !important;
     margin: 12px 0 !important;
+    background-color: #f3f4f6 !important;
+    border-radius: 6px !important;
+    color: #1f2937 !important;
   }
 
   code {
+    font-family: "Courier New", Courier, monospace !important;
     font-size: 14px !important;
+    color: #1f2937 !important;
   }
 
-  /* Disable text size adjustment for consistent rendering */
-  body {
-    -webkit-text-size-adjust: none;
-    text-size-adjust: none;
+  /* Inline code */
+  p code, li code {
+    background-color: #f3f4f6 !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+  }
+
+  /* Bold, italic, etc - ensure they inherit font family */
+  strong, b {
+    font-weight: 700 !important;
+  }
+
+  em, i {
+    font-style: italic !important;
   }
 `;
 
@@ -93,11 +145,13 @@ interface TipTapEditorProps {
   editable?: boolean;
   placeholder?: string;
   showToolbar?: boolean;
+  renderToolbarExternally?: boolean; // If true, returns editor bridge for external toolbar rendering
 }
 
 export interface TipTapEditorRef {
   forceContentUpdate: () => Promise<void>;
   getCurrentContent: () => Promise<any>;
+  getEditorBridge: () => any; // Expose editor bridge for external toolbar
 }
 
 const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
@@ -106,6 +160,7 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
   editable = true,
   placeholder = 'Start writing your medical note...',
   showToolbar = true,
+  renderToolbarExternally = false,
 }, ref) => {
   const contentUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const lastContentRef = useRef<string>('');
@@ -116,65 +171,58 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
       console.log('Force update skipped - missing:', { editor: !!editor, editable, onContentChange: !!onContentChange });
       return;
     }
-    
+
     try {
       console.log('=== FORCE CONTENT UPDATE STARTED ===');
-      const htmlContent = await editor.getHTML();
-      console.log('Current HTML from editor:', htmlContent);
+      // Use getJSON() instead of getHTML() for direct TipTap JSON
+      const tipTapContent = await editor.getJSON();
+      const contentString = JSON.stringify(tipTapContent);
+      console.log('Current TipTap JSON from editor:', contentString);
       console.log('Last stored content:', lastContentRef.current);
-      console.log('Content comparison:', htmlContent === lastContentRef.current ? 'SAME' : 'DIFFERENT');
-      
+      console.log('Content comparison:', contentString === lastContentRef.current ? 'SAME' : 'DIFFERENT');
+
       // Always update content when force update is called, regardless of comparison
       console.log('Force update - processing content change...');
-      lastContentRef.current = htmlContent;
-      
-      try {
-        // Convert HTML to TipTap for consistency
-        const { convertHtmlToTipTap } = require('../../utils/tiptapConverter');
-        const tipTapContent = convertHtmlToTipTap(htmlContent);
-        console.log('Force update - converted HTML to TipTap:', JSON.stringify(tipTapContent, null, 2));
-        onContentChange(tipTapContent);
-        console.log('Force update - content change callback executed successfully');
-      } catch (error: any) {
-        console.error('Error in content processing:', error);
-        console.log('Fallback: passing raw HTML content');
-        onContentChange(htmlContent);
-      }
+      lastContentRef.current = contentString;
+
+      // Pass TipTap JSON directly - no conversion needed!
+      console.log('Force update - TipTap JSON:', JSON.stringify(tipTapContent, null, 2));
+      onContentChange(tipTapContent);
+      console.log('Force update - content change callback executed successfully');
     } catch (error: any) {
-      console.error('Error getting HTML from editor:', error);
+      console.error('Error getting JSON from editor:', error);
     }
-    
+
     console.log('=== FORCE CONTENT UPDATE COMPLETED ===');
   };
 
-  // Convert TipTap JSON to HTML for the editor
-  const convertTipTapToHtmlContent = (tipTapContent: any): string => {
-    if (!tipTapContent) return '';
-    
+  // Convert TipTap JSON to HTML for initialContent (workaround for 10tap-editor bug #282)
+  const initialHtml = React.useMemo(() => {
+    if (!initialContent) return '';
+
     try {
-      if (typeof tipTapContent === 'string') {
-        return tipTapContent;
+      // If it's already a string, use it
+      if (typeof initialContent === 'string') {
+        return initialContent;
       }
-      
-      const converted = convertTipTapToHtml(tipTapContent);
-      console.log('Minimal - TipTap to HTML conversion:', converted);
-      return converted;
-    } catch (error: any) {
+
+      // Convert TipTap JSON to HTML
+      const html = convertTipTapToHtml(initialContent);
+      console.log('TipTapEditor - Converted TipTap JSON to HTML:', html);
+      return html;
+    } catch (error) {
       console.error('Error converting TipTap to HTML:', error);
       return '';
     }
-  };
-
-  const initialHtmlContent = convertTipTapToHtmlContent(initialContent);
-  console.log('Minimal - Initial content:', initialHtmlContent);
+  }, [initialContent]);
 
   console.log('TipTapEditor - Props:', { initialContent, editable, placeholder });
-  console.log('TipTapEditor - onContentChange type:', typeof onContentChange);
-  
+  console.log('TipTapEditor - Initial HTML for editor:', initialHtml);
+
   const editor = useEditorBridge({
     autofocus: false,
     avoidIosKeyboard: false,
-    initialContent: initialHtmlContent || '',
+    initialContent: initialHtml,
     editable: editable,
   });
 
@@ -186,42 +234,36 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
         // Wait for editor to be ready
         let retries = 0;
         const maxRetries = 10;
-        
+
         while (retries < maxRetries) {
           try {
-            // Check if editor is ready by testing a simple operation
-            await editor.getHTML();
-            
-            // Only set initial content if we haven't set any content yet
-            if (initialContent && initialHtmlContent && !lastContentRef.current) {
-              console.log('Minimal - Setting initial content:', initialHtmlContent);
-              await editor.setContent(initialHtmlContent);
-              lastContentRef.current = initialHtmlContent;
-              console.log('✓ Initial content set successfully');
-              break;
-            } else if (lastContentRef.current) {
-              console.log('✓ Editor ready, content already exists, skipping initial content');
-              break;
-            } else {
-              console.log('✓ Editor ready, no initial content to set');
-              break;
-            }
+            await editor.getJSON();
+            console.log('✓ Editor bridge ready');
+            break;
           } catch (error: any) {
             retries++;
             console.warn(`Editor not ready yet, retry ${retries}/${maxRetries}`);
             if (retries >= maxRetries) {
-              console.error('Failed to initialize content after max retries:', error);
+              console.error('Failed to initialize editor after max retries:', error);
               break;
             }
             await new Promise<void>(resolve => setTimeout(resolve, 500));
           }
+        }
+
+        // Inject CSS ASAP
+        editor.injectCSS(MOBILE_TYPOGRAPHY_CSS, 'mobile-typography');
+        console.log('✅ Mobile typography CSS injected');
+
+        if (initialHtml && !lastContentRef.current) {
+          lastContentRef.current = initialHtml;
+          console.log('✓ Initial content loaded successfully');
         }
       } catch (error: any) {
         console.error('Error initializing content:', error);
       }
     };
 
-    // Only initialize once
     initializeContent();
   }, [editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -231,63 +273,34 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
     }
   }, [editor, editable]);
 
-  // Inject mobile-optimized typography CSS once when editor initializes
-  useEffect(() => {
-    if (!editor) return;
-
-    const setupMobileTypography = async () => {
-      try {
-        // Wait for editor to be ready
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        // Inject mobile typography CSS once
-        // This is the proper way to configure WebView styles for mobile
-        editor.injectCSS(MOBILE_TYPOGRAPHY_CSS, 'mobile-typography');
-
-        console.log('✅ Mobile typography configured');
-      } catch (error: any) {
-        console.error('Error configuring mobile typography:', error);
-      }
-    };
-
-    setupMobileTypography();
-  }, [editor]);
-
   // Monitor content changes using polling
   useEffect(() => {
     if (!editor || !editable || !onContentChange) return;
 
     const checkContentChanges = async () => {
       try {
-        const htmlContent = await editor.getHTML();
-        if (htmlContent !== lastContentRef.current && htmlContent.trim() !== '') {
+        // Use getJSON() for direct TipTap JSON - no conversion needed!
+        const tipTapContent = await editor.getJSON();
+        const contentString = JSON.stringify(tipTapContent);
+
+        if (contentString !== lastContentRef.current && contentString.trim() !== '') {
           console.log('Content change detected via polling');
           console.log('Previous:', lastContentRef.current);
-          console.log('Current:', htmlContent);
-          
-          lastContentRef.current = htmlContent;
-          
+          console.log('Current:', contentString);
+
+          lastContentRef.current = contentString;
+
           if (contentUpdateRef.current) {
             clearTimeout(contentUpdateRef.current);
           }
-          
+
           contentUpdateRef.current = setTimeout(() => {
             console.log('=== TRIGGERING CONTENT CHANGE ===');
-            console.log('Sending content to parent:', htmlContent);
-            
-            try {
-              // Convert HTML to TipTap for saving
-              const { convertHtmlToTipTap } = require('../../utils/tiptapConverter');
-              const tipTapContent = convertHtmlToTipTap(htmlContent);
-              console.log('Converted HTML to TipTap:', JSON.stringify(tipTapContent, null, 2));
-              onContentChange(tipTapContent);
-              console.log('✓ Content change callback executed successfully with TipTap data');
-            } catch (error: any) {
-              console.error('✗ Error converting HTML to TipTap:', error);
-              // Fallback: send HTML and let parent handle conversion
-              onContentChange(htmlContent);
-              console.log('✓ Content change callback executed with HTML fallback');
-            }
+            console.log('Sending TipTap JSON to parent:', contentString);
+
+            // Pass TipTap JSON directly - no conversion!
+            onContentChange(tipTapContent);
+            console.log('✓ Content change callback executed successfully with TipTap JSON');
           }, 100);
         }
       } catch (error: any) {
@@ -297,7 +310,7 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
 
     // Poll for changes every 500ms when editor is focused/active
     const interval = setInterval(checkContentChanges, 500);
-    
+
     return () => {
       clearInterval(interval);
     };
@@ -319,8 +332,8 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
     getCurrentContent: async () => {
       if (editor) {
         try {
-          const htmlContent = await editor.getHTML();
-          const tipTapContent = convertHtmlToTipTap(htmlContent);
+          // Use getJSON() for direct TipTap JSON - no conversion!
+          const tipTapContent = await editor.getJSON();
           return tipTapContent;
         } catch (error: any) {
           console.error('Error getting current content:', error);
@@ -328,17 +341,48 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
         }
       }
       return null;
-    }
+    },
+    getEditorBridge: () => editor,
   }), [editor, forceContentUpdate]);
 
+  if (!editable) {
+    // Read-only mode - no toolbar needed
+    return (
+      <View style={[styles.container, styles.readOnlyContainer]}>
+        <RichText
+          editor={editor}
+          style={[styles.editor, styles.readOnlyEditor]}
+        />
+      </View>
+    );
+  }
+
+  // Editable mode - if renderToolbarExternally is true, only return RichText
+  if (renderToolbarExternally) {
+    return (
+      <View style={styles.editorWrapper}>
+        <RichText
+          editor={editor}
+          style={styles.editor}
+        />
+      </View>
+    );
+  }
+
+  // Default mode with embedded toolbar (for simple use cases)
   return (
-    <View style={[styles.container, !editable && styles.readOnlyContainer]}>
+    <View style={styles.editorWrapper}>
       <RichText
         editor={editor}
-        style={[styles.editor, !editable && styles.readOnlyEditor]}
+        style={styles.editor}
       />
-      {showToolbar && editable && (
-        <EditorKeyboardToolbar editor={editor} />
+      {showToolbar && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingView}
+        >
+          <Toolbar editor={editor} />
+        </KeyboardAvoidingView>
       )}
     </View>
   );
@@ -349,6 +393,19 @@ TipTapEditor.displayName = 'TipTapEditor';
 export default TipTapEditor;
 
 const styles = StyleSheet.create({
+  editorWrapper: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  // Official 10tap-editor pattern for toolbar above keyboard
+  keyboardAvoidingView: {
+    position: 'absolute',
+    width: '100%',
+    bottom: 0,
+  },
   container: {
     flex: 1,
     backgroundColor: 'white',

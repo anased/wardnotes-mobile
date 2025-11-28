@@ -330,7 +330,7 @@ export class FlashcardService {
   static async getStudyCardsForNote(noteId: string, maxDue: number = 30, maxNew: number = 10): Promise<Flashcard[]> {
     const user = await this.getAuthenticatedUser();
 
-    // Get due cards for this note
+    // Get due cards for this note (excluding new cards to avoid duplicates)
     const dueQuery = supabase
       .from('flashcards')
       .select('*')
@@ -338,6 +338,7 @@ export class FlashcardService {
       .eq('note_id', noteId)
       .lte('next_review', new Date().toISOString())
       .neq('status', 'suspended')
+      .neq('status', 'new')
       .order('next_review', { ascending: true })
       .limit(maxDue);
 

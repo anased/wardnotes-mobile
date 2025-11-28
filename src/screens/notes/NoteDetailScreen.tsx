@@ -17,6 +17,7 @@ import useCategories from '../../hooks/useCategories';
 import NativeNoteRenderer from '../../components/notes/NativeNoteRenderer';
 import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
 import NoteFlashcards from '../../components/notes/NoteFlashcards';
+import FlashcardGeneratorModal from '../../components/flashcards/FlashcardGeneratorModal';
 import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
 import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
 
@@ -30,6 +31,7 @@ export default function NoteDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [isWebOnlyNote, setIsWebOnlyNote] = useState(false);
+  const [showFlashcardGenerator, setShowFlashcardGenerator] = useState(false);
 
   const { fetchNoteById, removeNote } = useNotes();
   const { categories } = useCategories();
@@ -106,7 +108,16 @@ export default function NoteDetailScreen() {
   };
 
   const handleGenerateFlashcards = () => {
-    Alert.alert('Coming Soon', 'Flashcard generation will be available in the premium version');
+    setShowFlashcardGenerator(true);
+  };
+
+  const handleFlashcardGeneratorClose = () => {
+    setShowFlashcardGenerator(false);
+  };
+
+  const handleFlashcardGenerationSuccess = () => {
+    // Reload the note to refresh the flashcards section
+    loadNote();
   };
 
   const formatDate = (dateString: string) => {
@@ -292,6 +303,15 @@ export default function NoteDetailScreen() {
 
         <NoteFlashcards noteId={noteId} />
       </ScrollView>
+
+      {/* Flashcard Generator Modal */}
+      <FlashcardGeneratorModal
+        visible={showFlashcardGenerator}
+        noteId={noteId}
+        noteTitle={note?.title || ''}
+        onClose={handleFlashcardGeneratorClose}
+        onSuccess={handleFlashcardGenerationSuccess}
+      />
     </SafeAreaView>
   );
 }

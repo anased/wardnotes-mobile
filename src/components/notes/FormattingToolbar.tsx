@@ -7,26 +7,37 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 export interface FormattingAction {
-  type: 'heading1' | 'heading2' | 'heading3' | 'bold' | 'italic' | 'bulletList' | 'orderedList' | 'undo' | 'redo';
+  type: 'heading1' | 'heading2' | 'heading3' | 'bold' | 'italic' | 'code' | 'strikethrough' | 'bulletList' | 'orderedList' | 'blockquote' | 'codeBlock' | 'undo' | 'redo';
 }
 
 interface FormattingToolbarProps {
   onFormat: (action: FormattingAction) => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  currentBlockType?: string;
+  hasSelection?: boolean;
 }
 
-export default function FormattingToolbar({ onFormat, canUndo = false, canRedo = false }: FormattingToolbarProps) {
+export default function FormattingToolbar({ onFormat, canUndo = false, canRedo = false, currentBlockType, hasSelection = false }: FormattingToolbarProps) {
   const insets = useSafeAreaInsets();
 
-  const buttons = [
-    { type: 'heading1' as const, icon: 'text', label: 'H1' },
-    { type: 'heading2' as const, icon: 'text', label: 'H2' },
-    { type: 'heading3' as const, icon: 'text', label: 'H3' },
-    { type: 'bold' as const, icon: 'text', label: 'B', iconName: null },
-    { type: 'italic' as const, icon: 'text', label: 'I', iconName: null },
-    { type: 'bulletList' as const, icon: 'list', label: '•' },
-    { type: 'orderedList' as const, icon: 'list', label: '1.' },
+  // Block type buttons (change entire block)
+  const blockButtons = [
+    { type: 'heading1' as const, label: 'H1' },
+    { type: 'heading2' as const, label: 'H2' },
+    { type: 'heading3' as const, label: 'H3' },
+    { type: 'bulletList' as const, icon: 'list' as const },
+    { type: 'orderedList' as const, icon: 'list-outline' as const },
+    { type: 'blockquote' as const, icon: 'chatbox-outline' as const },
+    { type: 'codeBlock' as const, icon: 'code-slash' as const },
+  ];
+
+  // Inline formatting buttons (require text selection)
+  const inlineButtons = [
+    { type: 'bold' as const, label: 'B', bold: true },
+    { type: 'italic' as const, label: 'I', italic: true },
+    { type: 'code' as const, label: '<>' },
+    { type: 'strikethrough' as const, icon: 'remove' as const },
   ];
 
   return (
@@ -37,33 +48,64 @@ export default function FormattingToolbar({ onFormat, canUndo = false, canRedo =
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="always"
       >
-        {buttons.map((button) => (
+        {/* Block type buttons */}
+        {blockButtons.map((button) => {
+          const isActive = currentBlockType === button.type ||
+            (button.type.includes('heading') && currentBlockType === 'heading');
+
+          return (
+            <TouchableOpacity
+              key={button.type}
+              style={[styles.button, isActive && styles.buttonActive]}
+              onPress={() => onFormat({ type: button.type })}
+              activeOpacity={0.7}
+            >
+              {'label' in button ? (
+                <Text style={[
+                  styles.buttonText,
+                  button.type === 'heading1' && styles.h1Text,
+                  button.type === 'heading2' && styles.h2Text,
+                  button.type === 'heading3' && styles.h3Text,
+                  isActive && styles.buttonTextActive,
+                ]}>
+                  {button.label}
+                </Text>
+              ) : (
+                <Ionicons name={button.icon} size={20} color={isActive ? "#0ea5e9" : "#374151"} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+
+        <View style={styles.separator} />
+
+        {/* Inline formatting buttons */}
+        {inlineButtons.map((button) => (
           <TouchableOpacity
             key={button.type}
-            style={styles.button}
+            style={[styles.button, !hasSelection && styles.buttonDisabled]}
             onPress={() => onFormat({ type: button.type })}
+            disabled={!hasSelection}
             activeOpacity={0.7}
           >
-            {button.type === 'heading1' ? (
-              <Text style={[styles.buttonText, styles.h1Text]}>H1</Text>
-            ) : button.type === 'heading2' ? (
-              <Text style={[styles.buttonText, styles.h2Text]}>H2</Text>
-            ) : button.type === 'heading3' ? (
-              <Text style={[styles.buttonText, styles.h3Text]}>H3</Text>
-            ) : button.type === 'bold' ? (
-              <Text style={[styles.buttonText, styles.boldText]}>B</Text>
-            ) : button.type === 'italic' ? (
-              <Text style={[styles.buttonText, styles.italicText]}>I</Text>
-            ) : button.type === 'bulletList' ? (
-              <Ionicons name="list" size={20} color="#374151" />
-            ) : button.type === 'orderedList' ? (
-              <Ionicons name="list-outline" size={20} color="#374151" />
-            ) : null}
+            {'label' in button ? (
+              <Text style={[
+                styles.buttonText,
+                'bold' in button && styles.boldText,
+                'italic' in button && styles.italicText,
+                !hasSelection && styles.textDisabled,
+              ]}>
+                {button.label}
+              </Text>
+            ) : (
+              <Ionicons name={button.icon} size={20} color={hasSelection ? "#374151" : "#d1d5db"} />
+            )}
           </TouchableOpacity>
         ))}
 
         <View style={styles.separator} />
 
+        {/* Undo/Redo */}
         <TouchableOpacity
           style={[styles.button, !canUndo && styles.buttonDisabled]}
           onPress={() => onFormat({ type: 'undo' })}
@@ -108,6 +150,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  buttonActive: {
+    backgroundColor: '#e0f2fe',
+    borderColor: '#0ea5e9',
+  },
   buttonDisabled: {
     opacity: 0.4,
   },
@@ -115,6 +161,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
+  },
+  buttonTextActive: {
+    color: '#0ea5e9',
+  },
+  textDisabled: {
+    color: '#d1d5db',
   },
   h1Text: {
     fontSize: 18,

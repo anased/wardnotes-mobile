@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useFlashcards } from '../../hooks/useFlashcards';
+import FlashcardListModal from '../flashcards/FlashcardListModal';
 import type { CombinedNavigationProp } from '../../types/navigation';
 import type { Flashcard } from '../../types/flashcard';
 
@@ -20,7 +21,8 @@ interface NoteFlashcardsProps {
 
 export default function NoteFlashcards({ noteId }: NoteFlashcardsProps) {
   const navigation = useNavigation<CombinedNavigationProp>();
-  const { flashcards, loading, error } = useFlashcards({ note_id: noteId });
+  const { flashcards, loading, error, refresh } = useFlashcards({ note_id: noteId });
+  const [showFlashcardListModal, setShowFlashcardListModal] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     due: 0,
@@ -52,11 +54,9 @@ export default function NoteFlashcards({ noteId }: NoteFlashcardsProps) {
     });
   };
 
-  const handleViewCard = (card: Flashcard) => {
-    // Navigate to the deck that contains this card
-    if (card.deck_id) {
-      navigation.navigate('DeckScreen', { deckId: card.deck_id });
-    }
+  const handleViewCard = () => {
+    // Open the flashcard list modal
+    setShowFlashcardListModal(true);
   };
 
   if (loading) {
@@ -145,7 +145,7 @@ export default function NoteFlashcards({ noteId }: NoteFlashcardsProps) {
           <TouchableOpacity
             key={card.id}
             style={styles.cardItem}
-            onPress={() => handleViewCard(card)}
+            onPress={handleViewCard}
           >
             <View style={styles.cardContent}>
               <View style={styles.cardHeader}>
@@ -195,13 +195,24 @@ export default function NoteFlashcards({ noteId }: NoteFlashcardsProps) {
         ))}
 
         {flashcards.length > 5 && (
-          <View style={styles.moreIndicator}>
+          <TouchableOpacity
+            style={styles.moreIndicator}
+            onPress={handleViewCard}
+          >
             <Text style={styles.moreText}>
               +{flashcards.length - 5} more cards
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Flashcard List Modal */}
+      <FlashcardListModal
+        visible={showFlashcardListModal}
+        noteId={noteId}
+        onClose={() => setShowFlashcardListModal(false)}
+        onFlashcardUpdated={refresh}
+      />
     </View>
   );
 }

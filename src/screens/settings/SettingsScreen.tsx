@@ -108,61 +108,77 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={[styles.settingItem, styles.disabledItem]} disabled>
             <View style={styles.settingLeft}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="color-palette-outline" size={20} color="#0ea5e9" />
+              <View style={[styles.iconContainer, styles.disabledIconContainer]}>
+                <Ionicons name="color-palette-outline" size={20} color="#9ca3af" />
               </View>
-              <View>
-                <Text style={styles.settingTitle}>Appearance</Text>
-                <Text style={styles.settingSubtitle}>Theme and display options</Text>
+              <View style={{ flex: 1 }}>
+                <View style={styles.titleRow}>
+                  <Text style={[styles.settingTitle, styles.disabledText]}>Appearance</Text>
+                  <View style={styles.comingSoonBadge}>
+                    <Text style={styles.comingSoonText}>Coming Soon</Text>
+                  </View>
+                </View>
+                <Text style={[styles.settingSubtitle, styles.disabledText]}>Theme and display options</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={[styles.settingItem, styles.disabledItem]} disabled>
             <View style={styles.settingLeft}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="download-outline" size={20} color="#0ea5e9" />
+              <View style={[styles.iconContainer, styles.disabledIconContainer]}>
+                <Ionicons name="download-outline" size={20} color="#9ca3af" />
               </View>
-              <View>
-                <Text style={styles.settingTitle}>Data & Storage</Text>
-                <Text style={styles.settingSubtitle}>Backup and sync settings</Text>
+              <View style={{ flex: 1 }}>
+                <View style={styles.titleRow}>
+                  <Text style={[styles.settingTitle, styles.disabledText]}>Data & Storage</Text>
+                  <View style={styles.comingSoonBadge}>
+                    <Text style={styles.comingSoonText}>Coming Soon</Text>
+                  </View>
+                </View>
+                <Text style={[styles.settingSubtitle, styles.disabledText]}>Backup and sync settings</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />
           </TouchableOpacity>
         </View>
 
         {/* Support Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
-          
-          <TouchableOpacity style={styles.settingItem}>
+
+          <TouchableOpacity style={[styles.settingItem, styles.disabledItem]} disabled>
             <View style={styles.settingLeft}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="help-circle-outline" size={20} color="#0ea5e9" />
+              <View style={[styles.iconContainer, styles.disabledIconContainer]}>
+                <Ionicons name="help-circle-outline" size={20} color="#9ca3af" />
               </View>
-              <View>
-                <Text style={styles.settingTitle}>Help Center</Text>
-                <Text style={styles.settingSubtitle}>Get help and support</Text>
+              <View style={{ flex: 1 }}>
+                <View style={styles.titleRow}>
+                  <Text style={[styles.settingTitle, styles.disabledText]}>Help Center</Text>
+                  <View style={styles.comingSoonBadge}>
+                    <Text style={styles.comingSoonText}>Coming Soon</Text>
+                  </View>
+                </View>
+                <Text style={[styles.settingSubtitle, styles.disabledText]}>Get help and support</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={[styles.settingItem, styles.disabledItem]} disabled>
             <View style={styles.settingLeft}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="mail-outline" size={20} color="#0ea5e9" />
+              <View style={[styles.iconContainer, styles.disabledIconContainer]}>
+                <Ionicons name="mail-outline" size={20} color="#9ca3af" />
               </View>
-              <View>
-                <Text style={styles.settingTitle}>Contact Us</Text>
-                <Text style={styles.settingSubtitle}>Send feedback or report issues</Text>
+              <View style={{ flex: 1 }}>
+                <View style={styles.titleRow}>
+                  <Text style={[styles.settingTitle, styles.disabledText]}>Contact Us</Text>
+                  <View style={styles.comingSoonBadge}>
+                    <Text style={styles.comingSoonText}>Coming Soon</Text>
+                  </View>
+                </View>
+                <Text style={[styles.settingSubtitle, styles.disabledText]}>Send feedback or report issues</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward-outline" size={20} color="#9ca3af" />
           </TouchableOpacity>
         </View>
 
@@ -283,5 +299,31 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+  disabledItem: {
+    opacity: 0.6,
+  },
+  disabledIconContainer: {
+    backgroundColor: '#f3f4f6',
+  },
+  disabledText: {
+    color: '#9ca3af',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  comingSoonBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  comingSoonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#92400e',
   },
 });

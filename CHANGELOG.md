@@ -2,63 +2,507 @@
 
 This file tracks the complete history of major feature additions, architectural changes, and important fixes for the WardNotes mobile app.
 
-## Native Renderer & Editor Implementation (November 2025)
-**Status:** ✅ **COMPLETE** - True iOS Notes-like native experience achieved
+## AI Flashcard Generation Feature (November 2025)
+**Status:** ✅ **COMPLETE** - Full AI flashcard generation with native iOS UX
 
 ### What Changed
-- Replaced WebView-based TipTap editor with 100% native React Native components
-- Built custom TipTap JSON parser for native rendering
-- Created native note editor with formatting toolbar
-- Achieved true cross-platform architecture: native UI on mobile, TipTap on web, shared data format
+- Implemented complete AI flashcard generation feature for mobile app
+- Integrated with existing web app API endpoints (no code duplication)
+- Added preview, edit, and save workflow with native iOS patterns
+- Fixed iOS Picker component UX issues with custom modal selectors
+- Full feature parity with web app
 
-### The Problem
-- TipTap editor runs in WebView (essentially a mini browser)
-- WebView has CSS styling conflicts and performance overhead
-- Not truly native - feels "web-like" rather than "app-like"
-- Typography customization requires fighting CSS specificity
-- Professional note apps (Apple Notes, Evernote, Bear) use native components
+### Feature Capabilities
 
-### The Solution: Industry-Standard Architecture
+**1. Configuration Screen**
+- Card Type selector: Cloze Deletion or Front & Back
+- Deck selector: Choose from existing decks or create new
+- Max Cards control: Range 1-50, default 10 (+5/-5 buttons)
+- Real-time deck loading with loading states
+- Warning messages for no decks available
+
+**2. Generation Flow**
+- Calls web API: `POST /api/flashcards/generate-from-note`
+- Uses GPT-4o with same prompts as web app
+- Loading state with informative messages
+- Error handling for network, OpenAI, and auth failures
+- No fallback system (shows proper errors instead)
+
+**3. Preview & Edit Screen**
+- All cards selected by default (checkboxes)
+- Tap any card to open edit modal
+- Select/deselect individual cards
+- "Regenerate" button to generate new set
+- "Save Selected" button (only saves checked cards)
+- Shows card count and selection stats
+
+**4. Card Editing**
+- Cloze cards: Edit with {{c1::text}} format helper
+- Front/Back cards: Separate inputs for question and answer
+- Content validation (non-empty required)
+- Visual "Edited" badge on modified cards
+- Cancel/Save buttons with validation
+
+**5. Deck Creation**
+- Inline modal with color picker (8 preset colors)
+- Name, description, and color selection
+- Validation and error handling
+- Auto-reloads deck list after creation
+
+### Technical Architecture
+
+**API Integration:**
+```typescript
+// Calls existing web API
+const API_URL = 'https://wardnotes.vercel.app';
+POST /api/flashcards/generate-from-note
+  Headers: { Authorization: Bearer <token> }
+  Body: { note_id, card_type, deck_id, max_cards, preview: true }
+  Response: { cards: [...], preview: true }
 ```
-DATABASE (Platform-Agnostic)
-    ↓
-[TipTap JSON Format]
-    ↓
-    ├─→ WEB: TipTap Editor → HTML rendering
-    └─→ MOBILE: Custom Parser → Native React Native Text/View components
+
+**Security:**
+- OpenAI API key stays on server (web app)
+- Never exposed in mobile app binary
+- Bearer token authentication from Supabase session
+
+**Error Handling:**
+```typescript
+type GenerationError = {
+  message: string;
+  type: 'network' | 'api' | 'openai' | 'unknown';
+  retryable: boolean;
+}
 ```
 
-### Implementation Details
+**State Management:**
+```typescript
+type GenerationStatus =
+  | 'idle'        // Configuration screen
+  | 'loading'     // Generating cards
+  | 'preview'     // Preview/edit screen
+  | 'saving'      // Saving to database
+  | 'success'     // Completed
+  | 'error';      // Error occurred
+```
 
-#### Phase 1: Native Viewing (Read-Only)
+### iOS-Specific UX Fixes
 
-**1. TipTap Parser** (`src/utils/tiptapNativeParser.ts`)
-- Parses TipTap JSON from database
-- Converts to native-friendly block structure
-- Handles: headings, paragraphs, lists, blockquotes, code blocks
-- Extracts text formatting (bold, italic, underline, strike, code)
-- Type-safe interfaces for all node types
+**Problem:** iOS Picker Component Rendering
+- On iOS, `<Picker>` renders inline as a scroll wheel below the field
+- Tapping the label/field does nothing
+- Poor UX compared to native iOS selectors
 
-**2. Native Note Renderer** (`src/components/notes/NativeNoteRenderer.tsx`)
-- **100% native React Native components** (Text, View)
-- **Zero WebView usage** - true iOS experience
-- Mobile-optimized typography:
-  - H1: 24px (down from 32-36px desktop)
-  - H2: 20px (down from 28px)
-  - H3: 18px (down from 24px)
-  - Body: 16px with 1.5 line height
-  - Tighter margins for mobile density
-- Renders all TipTap node types as native components
-- Supports text formatting with native TextStyle props
-- Clean, maintainable styling using StyleSheet
+**Solution:** Custom Modal Pickers
+- Replaced inline Picker with touchable selector buttons
+- Tap button → Bottom sheet modal slides up → Picker wheel → Done/Cancel
+- Native iOS design pattern (like Safari date picker)
 
-**3. Updated NoteDetailScreen**
-- Replaced `TipTapEditor` WebView with `NativeNoteRenderer`
-- Removed 150+ lines of HTML conversion code (no longer needed)
-- Cleaner, simpler implementation
-- No CSS conflicts or WebView overhead
+**Implementation:**
+```typescript
+// Before (Poor UX)
+<Picker selectedValue={cardType} onValueChange={...}>
+  <Picker.Item label="Cloze" value="cloze" />
+</Picker>
 
-#### Phase 2: Native Editing
+// After (Native iOS UX)
+<TouchableOpacity onPress={() => setShowPicker(true)}>
+  <Text>Cloze Deletion</Text>
+  <Icon name="chevron-down" />
+</TouchableOpacity>
+
+<Modal visible={showPicker}>
+  <Picker selectedValue={cardType} onValueChange={...} />
+  <Button onPress={close}>Done</Button>
+</Modal>
+```
+
+**Additional Fix: Render Cycle Prevention**
+```typescript
+// iOS Picker fires onValueChange on mount, causing render errors
+onValueChange={(value) => {
+  // Only update if value actually changed
+  if (value !== currentValue) {
+    setCurrentValue(value);
+  }
+}}
+```
+
+### Files Created
+
+**1. Type Definitions (`src/types/flashcardGeneration.ts`)**
+- `GenerateFlashcardsRequest` - API request structure
+- `GeneratedCard` - Card format from API
+- `PreviewCard` - Card with selection/edit state
+- `GenerationStatus` - State machine types
+- `GenerationError` - Structured error types
+
+**2. API Service (`src/services/flashcardGeneration.ts`)**
+- `generateFlashcardsPreview()` - Generate without saving
+- `saveFlashcards()` - Save selected cards to deck
+- `generateAndSaveFlashcards()` - Direct mode (unused in MVP)
+- Error handling with structured error types
+- Bearer token authentication
+
+**3. DeckCreationModal (`src/components/flashcards/DeckCreationModal.tsx`)**
+- Name, description, color inputs
+- 8 preset colors with visual picker
+- Validation and error handling
+- Calls FlashcardService.createDeck()
+- Returns new deck ID to parent
+
+**4. FlashcardEditModal (`src/components/flashcards/FlashcardEditModal.tsx`)**
+- Edit cloze or front/back content
+- Type-specific UI (cloze vs front/back)
+- Validation ensures non-empty content
+- Visual hints for format ({{c1::text}})
+- Marks card as edited
+
+**5. FlashcardPreviewScreen (`src/components/flashcards/FlashcardPreviewScreen.tsx`)**
+- List of cards with checkboxes
+- Tap card to edit
+- "Select All" / "Deselect All" toggle
+- Shows selected count in button
+- Regenerate and Save buttons
+- Info banner with instructions
+
+**6. FlashcardGeneratorModal (`src/components/flashcards/FlashcardGeneratorModal.tsx`)**
+- Main orchestrator component
+- Configuration screen with selectors
+- Loading screen during generation
+- Error screen with retry
+- Preview screen integration
+- Custom modal pickers for iOS
+- State machine management
+
+### Files Modified
+
+**NoteDetailScreen (`src/screens/notes/NoteDetailScreen.tsx`)**
+- Added flashcard generator state
+- Integrated FlashcardGeneratorModal
+- Connected to existing ⚡ button (was placeholder)
+- Reloads note after successful generation
+
+### User Flow
+
+```
+1. User opens note detail screen
+2. Taps ⚡ icon → FlashcardGeneratorModal opens
+3. Configuration:
+   - Taps "Card Type" → Modal picker → Select → Done
+   - Taps "Target Deck" → Modal picker → Select deck or "Create New"
+   - If no decks: Taps "Create New Deck" button
+   - Adjusts card count with +5/-5 buttons
+4. Taps "Generate Flashcards" button
+5. Loading screen: "Generating flashcards..."
+6. Preview screen appears:
+   - All cards checked by default
+   - User taps card → Edit modal → Make changes → Save
+   - User unchecks unwanted cards
+   - User taps "Save Selected (N)"
+7. Saving: Brief loading state
+8. Success: Alert dialog confirms N cards saved
+9. Modal closes, note flashcards section refreshes
+```
+
+### Dependencies
+
+**Required:**
+- `@react-native-picker/picker` - Already installed (v2.11.1)
+- `@expo/vector-icons` - Already available
+
+**No New Dependencies Added**
+
+### Testing Checklist
+
+✅ Generate cloze deletion cards
+✅ Generate front & back cards
+✅ Edit card content before saving
+✅ Select/deselect individual cards
+✅ Create new deck inline
+✅ Handle network errors gracefully
+✅ Handle OpenAI API failures (no fallback)
+✅ iOS modal pickers work correctly
+✅ Cross-platform compatibility (iOS primary, Android compatible)
+
+### Impact
+
+- **Feature Parity:** Mobile app now has same AI generation as web app
+- **Consistency:** Uses same OpenAI prompts, ensures consistent card quality
+- **Security:** API key never exposed in mobile binary
+- **UX:** Native iOS patterns, feels like built-in functionality
+- **Performance:** Fast API calls, efficient state management
+- **Maintainability:** No code duplication, reuses web infrastructure
+
+---
+
+## Mobile-Optimized Typography (November 2025)
+**Status:** ✅ **COMPLETE** - Native iOS-like typography for editor
+
+### What Changed
+- Added mobile-optimized typography CSS to TipTapEditor component
+- Refactored EditNoteScreen to use TipTapEditor component (eliminated code duplication)
+- Fixed keyboard scrolling issues in CreateNoteScreen
+- Improved CSS injection timing to minimize flash of unstyled content
+
+### Typography Specifications
+**Font:** iOS system font (`-apple-system, BlinkMacSystemFont, "Segoe UI"...`)
+**Sizes:**
+- H1: 24px, bold (700)
+- H2: 20px, bold (700)
+- H3: 18px, bold (700)
+- H4: 17px, semibold (600)
+- H5-H6: 16px, semibold (600)
+- Paragraph/List: 16px, normal (400)
+- Code: 14px, monospace
+
+**Color:** #1f2937 (native text gray)
+**Line Heights:** 1.4 for headings, 1.5 for body text
+
+### Issues Fixed
+
+**1. Typography Mismatch Between Screens**
+- **Problem:** Editor showed serif/default WebView font instead of iOS system font
+- **Root Cause:** TipTap WebView uses default browser typography without custom CSS
+- **Solution:** Inject comprehensive typography CSS matching native iOS appearance
+```typescript
+const MOBILE_TYPOGRAPHY_CSS = `
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", ...;
+    color: #1f2937 !important;
+  }
+  h1 { font-size: 24px !important; font-weight: 700 !important; }
+  // ... etc
+`;
+editor.injectCSS(MOBILE_TYPOGRAPHY_CSS, 'mobile-typography');
+```
+
+**2. Code Duplication in EditNoteScreen**
+- **Problem:** EditNoteScreen used `useEditorBridge` directly, duplicating CSS and logic
+- **Root Cause:** Inconsistent implementation between CreateNoteScreen and EditNoteScreen
+- **Solution:** Refactored EditNoteScreen to use TipTapEditor component
+- **Impact:**
+  - Removed 152 lines of duplicated CSS
+  - Removed duplicate CSS injection logic
+  - Consistent typography across all screens
+  - Single source of truth for editor configuration
+
+**3. Keyboard Scrolling in CreateNoteScreen**
+- **Problem:** Pressing Enter caused entire screen to scroll to bottom
+- **Root Cause:** Conflict between outer ScrollView and editor's WebView scrolling
+- **Solution:**
+  - Changed `avoidIosKeyboard: false` in editor config
+  - Removed `keyboardDismissMode="on-drag"` from ScrollView
+  - Added `nestedScrollEnabled={true}` for proper nested scroll handling
+
+**4. Keyboard Dismissing on Scroll**
+- **Problem:** Scrolling dismissed the keyboard unexpectedly
+- **Root Cause:** `keyboardDismissMode="on-drag"` on parent ScrollView
+- **Solution:** Removed the prop, allowing keyboard to persist while scrolling
+
+### Files Modified
+- `src/components/notes/TipTapEditor.tsx` - Added mobile typography CSS
+- `src/screens/notes/EditNoteScreen.tsx` - Refactored to use TipTapEditor component
+- `src/screens/notes/CreateNoteScreen.tsx` - Fixed keyboard/scroll interaction
+
+### Technical Details
+**Before (Duplication):**
+```
+CreateNoteScreen → TipTapEditor (wrapper) → useEditorBridge + CSS
+EditNoteScreen   → useEditorBridge directly + duplicated CSS
+```
+
+**After (Consolidated):**
+```
+CreateNoteScreen → TipTapEditor → useEditorBridge + CSS
+EditNoteScreen   → TipTapEditor → useEditorBridge + CSS
+```
+
+**CSS Injection Flow:**
+1. Editor bridge created with `initialContent`
+2. When editor ready, CSS injected immediately
+3. Content renders with typography already applied
+4. Minimal/no flash of unstyled content
+
+---
+
+## 10tap-editor Integration (November 2025)
+**Status:** ✅ **COMPLETE** - Full TipTap WYSIWYG editor for React Native
+
+### What We've Accomplished
+✅ Integrated 10tap-editor (@10play/tentap-editor v0.7.4)
+✅ Replaced custom native markdown editor with WYSIWYG editor
+✅ Updated EditNoteScreen to use TipTapEditor component
+✅ Fixed content loading issue (HTML conversion for initialContent)
+✅ Fixed inconsistent content loading in EditNoteScreen (race condition eliminated)
+✅ Fixed keyboard scrolling with KeyboardAvoidingView
+✅ Replaced custom toolbar with 10tap-editor's built-in Toolbar
+✅ Added keyboard height tracking for iOS
+✅ Configured iOS native dependencies with CocoaPods
+✅ Added mobile-optimized typography matching native iOS appearance
+
+### Known Limitations
+⚠️ **Toolbar Positioning:** 10tap-editor toolbar appears at bottom of editor content instead of attached to keyboard (known issue #272). This is a library limitation; workaround would require significant custom implementation.
+
+### Issues Fixed
+
+**1. Empty Editor on Load**
+- **Problem:** Editor showed empty when editing existing notes
+- **Root Cause:** Race condition - editor mounted before content loaded from database
+- **Solution:** Conditional rendering - only render TipTapEditor when content exists
+```typescript
+{content ? (
+  <TipTapEditor initialContent={content} ... />
+) : (
+  <ActivityIndicator /> // Show loading
+)}
+```
+
+**2. HTML Tags Appearing in Editor**
+- **Problem:** Raw HTML tags like `<ul><li><p>` visible in editor text
+- **Root Cause:** Converting TipTap JSON → HTML → TipTap JSON caused data corruption
+- **Solution:** Use `getJSON()` instead of `getHTML()` throughout
+```typescript
+// Before: HTML conversion (caused corruption)
+const html = await editor.getHTML();
+const tipTap = convertHtmlToTipTap(html);
+
+// After: Direct JSON (no conversion)
+const tipTap = await editor.getJSON();
+```
+
+**3. Content Not Appearing in Editor (Bug #282)**
+- **Problem:** `initialContent` with TipTap JSON from database didn't render
+- **Root Cause:** Known 10tap-editor bug - JSON from database doesn't initialize correctly
+- **Solution:** Convert TipTap JSON → HTML for `initialContent`
+```typescript
+const initialHtml = React.useMemo(() => {
+  return convertTipTapToHtml(initialContent);
+}, [initialContent]);
+
+const editor = useEditorBridge({
+  initialContent: initialHtml, // HTML string, not JSON
+});
+```
+
+**4. Keyboard Covering Content**
+- **Problem:** Couldn't scroll to see content when keyboard appeared
+- **Solution:** Added KeyboardAvoidingView to EditNoteScreen with proper configuration
+
+**5. Inconsistent Content Loading in EditNoteScreen (November 2025)**
+- **Problem:** Some notes loaded content correctly, others showed "Write something" placeholder
+- **Root Cause:** Race condition - editor created with empty `initialContent`, then content loaded dynamically via `setContent()` after note fetch
+- **Symptoms:**
+  - Worked for some notes (fast database response)
+  - Failed for others (slower database response)
+  - Unreliable due to arbitrary 1000ms timeout and async timing issues
+- **Solution:** Refactored to follow React declarative pattern and 10tap-editor best practices
+  - Use `useMemo` to convert TipTap JSON → HTML when content loads
+  - Pass converted HTML as `initialContent` to `useEditorBridge`
+  - Removed dynamic `setContent()` calls and verification logic
+  - Eliminated 80 lines of unreliable async code
+```typescript
+// Before (race condition):
+const editor = useEditorBridge({ initialContent: '' }); // Empty!
+useEffect(() => {
+  await setTimeout(1000); // Arbitrary delay
+  await editor.setContent(html); // May fail
+}, [content]);
+
+// After (reliable):
+const initialHtml = React.useMemo(() =>
+  convertTipTapToHtml(content), [content]
+);
+const editor = useEditorBridge({ initialContent: initialHtml });
+```
+- **Impact:** 100% reliable content loading, simpler codebase, follows official 10tap-editor pattern
+- **Files Modified:** `src/screens/notes/EditNoteScreen.tsx`
+
+### Current Issue: Toolbar Positioning
+
+**Problem:** Toolbar appears at bottom of editor content, not attached to keyboard top
+
+**Solutions Attempted:**
+
+1. **KeyboardAvoidingView in TipTapEditor** - Toolbar still at bottom of editor
+2. **Toolbar with InputAccessoryView** - Not supported by 10tap-editor
+3. **Absolute positioning with keyboard height tracking** - Positioned at top instead of bottom
+4. **Separated wrapper structure** - Current attempt (toolbar at `bottom: 0`)
+
+**Current Code Structure:**
+```typescript
+<View style={styles.editorWrapper}>
+  <KeyboardAvoidingView>
+    <RichText editor={editor} />
+  </KeyboardAvoidingView>
+  {showToolbar && keyboardHeight > 0 && (
+    <View style={{ position: 'absolute', bottom: 0 }}>
+      <Toolbar editor={editor} />
+    </View>
+  )}
+</View>
+```
+
+**Next Steps to Try:**
+- Use SafeAreaView with keyboard tracking
+- Try `react-native-keyboard-aware-scroll-view`
+- Implement custom InputAccessoryView wrapper
+- Check 10tap-editor custom keyboard example implementation
+
+### Architecture
+
+**Data Flow:**
+```
+DATABASE (TipTap JSON)
+    ↓
+EDITING:
+  TipTap JSON → HTML → useEditorBridge(initialContent: HTML)
+  User edits → getJSON() → TipTap JSON → Save to DB
+    ↓
+VIEWING:
+  TipTap JSON → Parser → Native React Native components
+```
+
+**Why This Hybrid Approach:**
+- **Input (initialContent):** HTML string (workaround for bug #282)
+- **Output (getJSON):** TipTap JSON (no conversion, no corruption)
+- **Viewing:** Native components (better performance)
+
+### Files Modified
+
+**Components:**
+- `src/components/notes/TipTapEditor.tsx` - Main editor component using 10tap-editor
+  - Uses `RichText` and `Toolbar` from @10play/tentap-editor
+  - HTML → TipTap conversion for initialContent
+  - JSON output via `getJSON()`
+  - Keyboard height tracking for iOS
+  - Mobile typography CSS injection
+
+**Screens:**
+- `src/screens/notes/EditNoteScreen.tsx`
+  - Conditional rendering (wait for content before showing editor)
+  - KeyboardAvoidingView for keyboard scrolling
+  - Uses TipTapEditor with ref for force updates
+
+**Dependencies:**
+- `@10play/tentap-editor: ^0.7.4` (already installed)
+- `react-native-webview: 13.13.5` (required by 10tap-editor)
+
+**iOS Configuration:**
+- CocoaPods: `tentap` pod linked successfully
+- Native codegen: `RNTenTapViewSpec` generated
+
+---
+
+## Native Renderer & Editor Implementation (November 2025 - ARCHIVED)
+**Status:** ⚠️ **REPLACED** - Superseded by 10tap-editor integration
+
+This approach was replaced because:
+- Markdown editing less intuitive than WYSIWYG
+- Custom toolbar complexity
+- 10tap-editor provides better mobile experience
+
+#### Phase 2: Native Editing (ARCHIVED)
 
 **4. Native-to-TipTap Converter** (`src/utils/nativeToTipTap.ts`)
 - Converts plain text with markdown-style formatting to TipTap JSON
@@ -197,6 +641,153 @@ DATABASE (Platform-Agnostic)
 - ✅ Editing: Native TextInput with formatting toolbar functional
 - ✅ Saving: TipTap JSON saved correctly to database
 - ✅ Cross-platform: Content displays correctly on web after mobile edit
+
+---
+
+## WYSIWYG Editor Exploration (November 2025)
+**Status:** ⚠️ **RESEARCH** - Explored block-based WYSIWYG, discovered architectural limitations
+
+### Objective
+Enhance the note editor to provide true WYSIWYG (What You See Is What You Get) experience where:
+- Users see formatted text while editing (no markdown markers visible)
+- Headings appear large (24px) during editing, not just when viewing
+- Bold/italic text is visually styled in real-time
+- Low-friction editing with effortless formatting
+
+### Approaches Explored
+
+#### Approach 1: Block-Based WYSIWYG Editor
+**Architecture:**
+- Each paragraph/heading/list item = separate TextInput component
+- Multiple TextInputs sharing same InputAccessoryView ID
+- Visual styling applied to each TextInput based on block type
+- TipTap JSON ↔ Block structure conversion
+
+**Files Created:**
+- `src/types/editor.ts` - Block-based data model with rich text spans
+- `src/utils/blockConverter.ts` - TipTap JSON ↔ Editor Blocks converter (280 lines)
+- `src/components/notes/RichTextInput.tsx` - Single block editor with WYSIWYG styling
+- `src/components/notes/WYSIWYGNoteEditor.tsx` - Main multi-block editor component
+
+**Implementation Details:**
+```typescript
+// Data structure
+interface EditorBlock {
+  id: string;
+  type: 'paragraph' | 'heading' | 'bulletList' | 'orderedList' | 'blockquote' | 'codeBlock';
+  level?: number; // For headings (1-6)
+  spans: TextSpan[];
+}
+
+interface TextSpan {
+  text: string;
+  marks?: { bold?: boolean; italic?: boolean; code?: boolean };
+}
+```
+
+**Features Implemented:**
+- Block-level WYSIWYG (headings rendered at correct size while editing)
+- Smart block navigation (Enter creates new block, Backspace deletes empty blocks)
+- Block type switching via toolbar
+- TipTap JSON compatibility maintained
+- Enhanced FormattingToolbar with block type selector and active state indicators
+
+#### Approach 2: Screen-Level InputAccessoryView
+**Attempted Fix:**
+- Moved InputAccessoryView to EditNoteScreen (SafeAreaView level)
+- Used forwardRef pattern to expose editor methods
+- State callbacks to update toolbar in real-time
+- Attempted to avoid React Native nesting limitations
+
+### The Problem Discovered
+
+**InputAccessoryView Architectural Limitation:**
+```
+❌ DOESN'T WORK:
+Multiple TextInput components → Same InputAccessoryView ID
+(iOS doesn't support this pattern)
+
+✅ WORKS:
+Single TextInput → Single InputAccessoryView
+(1:1 relationship)
+```
+
+**Why It Failed:**
+1. Block-based editor requires multiple TextInput components (one per block)
+2. InputAccessoryView expects a 1:1 relationship with a single TextInput
+3. When multiple TextInputs share the same `inputAccessoryViewID`, iOS doesn't know which one to attach the toolbar to
+4. Result: Toolbar never appears above keyboard despite correct implementation
+
+**Debugging Evidence:**
+- ✅ TextInputs rendering correctly with proper `inputAccessoryViewID`
+- ✅ InputAccessoryView rendering at component level
+- ✅ IDs matching exactly (`wardnotes-wysiwyg-toolbar`)
+- ✅ Blocks getting focused correctly
+- ❌ Toolbar never appeared above keyboard
+- ✅ Reverted to NativeNoteEditor (single TextInput) → toolbar immediately worked
+
+### Files Cleaned Up
+The following experimental files were created but not integrated into production:
+- `src/types/editor.ts` - Can be repurposed for future WYSIWYG attempts
+- `src/utils/blockConverter.ts` - Solid TipTap conversion logic, reusable
+- `src/components/notes/RichTextInput.tsx` - Component architecture was sound
+- `src/components/notes/WYSIWYGNoteEditor.tsx` - Good patterns for block management
+
+### Key Learnings
+
+**React Native Constraints:**
+1. **InputAccessoryView limitation**: Only works with single TextInput per ID
+2. **Multi-TextInput WYSIWYG is not viable** on React Native without custom native modules
+3. **Current markdown editor is optimal** for React Native's capabilities
+
+**What Works:**
+- ✅ Single TextInput with markdown syntax (current NativeNoteEditor)
+- ✅ InputAccessoryView keyboard toolbar (proven working)
+- ✅ TipTap JSON storage/sync (web compatibility maintained)
+- ✅ Native rendering for viewing (NativeNoteRenderer)
+
+**Industry Comparison:**
+- **Notion Mobile**: Uses WebView for editing (not truly native)
+- **Apple Notes**: Native UITextView with NSAttributedString (single text view)
+- **Evernote**: Native editors but proprietary storage format
+- **Bear**: Markdown-based like our current approach
+
+### Recommended Path Forward
+
+**Option A: Enhanced Markdown Editor** ⭐ (Recommended)
+- Keep single TextInput architecture (proven to work)
+- Add smart auto-formatting features:
+  - Auto-continue lists (press Enter in list → new bullet appears)
+  - Smart list exit (double Enter or backspace on empty item)
+  - Auto-heading shortcuts (type `## ` → heading mode)
+- Add preview toggle button (view formatted output)
+- Enhance toolbar with more formatting options
+- **Benefit**: Works within React Native constraints, professional UX
+
+**Option B: WebView WYSIWYG**
+- Use TipTap editor in WebView (like web app)
+- Full WYSIWYG experience
+- **Drawback**: Not truly native, performance overhead, CSS conflicts
+
+**Option C: Hybrid View/Edit**
+- Native viewing (current NativeNoteRenderer - works great)
+- Markdown editing (current NativeNoteEditor - works great)
+- Split-view preview mode
+- **Benefit**: Best of both worlds, leverages existing working code
+
+### Current Status
+- Reverted to `NativeNoteEditor` (markdown-based, single TextInput)
+- InputAccessoryView toolbar confirmed working
+- All WYSIWYG experimental code preserved but not in use
+- Ready to enhance markdown editor or pursue alternative WYSIWYG approach
+
+### Decision Point
+Project is at a crossroads:
+1. **Enhance current markdown editor** (fast, proven, works within constraints)
+2. **Explore WebView WYSIWYG** (full features, but loses native feel)
+3. **Accept markdown editing** as industry-standard approach (Bear, iA Writer, Ulysses all use markdown)
+
+The current implementation (native viewing + markdown editing) already matches or exceeds many professional note apps while maintaining perfect web/mobile sync.
 - ✅ Markdown shortcuts work (# for headings, - for lists)
 - ✅ Undo/Redo functional with proper state management
 - ✅ Keyboard toolbar stays attached during editing

@@ -131,11 +131,37 @@ function convertNodeToBlock(node: TipTapNode): NativeBlock | null {
       };
 
     case 'listItem':
-      // List items contain paragraphs
-      const listItemContent = node.content?.[0]; // First child is usually the paragraph
+      // List items can contain paragraphs and nested lists
+      if (!node.content || node.content.length === 0) {
+        return {
+          type: 'listItem',
+          segments: [],
+        };
+      }
+
+      // Collect all text segments from paragraphs
+      const textSegments: TextSegment[] = [];
+      const nestedLists: NativeBlock[] = [];
+
+      node.content.forEach(child => {
+        if (child.type === 'paragraph') {
+          // Extract text from paragraph
+          if (child.content) {
+            textSegments.push(...child.content.flatMap(extractTextSegments));
+          }
+        } else if (child.type === 'bulletList' || child.type === 'orderedList') {
+          // Handle nested lists
+          const nestedBlock = convertNodeToBlock(child);
+          if (nestedBlock) {
+            nestedLists.push(nestedBlock);
+          }
+        }
+      });
+
       return {
         type: 'listItem',
-        segments: listItemContent?.content ? listItemContent.content.flatMap(extractTextSegments) : [],
+        segments: textSegments,
+        children: nestedLists.length > 0 ? nestedLists : undefined,
       };
 
     case 'blockquote':
@@ -152,6 +178,7 @@ function convertNodeToBlock(node: TipTapNode): NativeBlock | null {
       };
 
     default:
+      console.warn(`⚠️ Unsupported TipTap node type: "${node.type}" - content will be skipped`);
       return null;
   }
 }

@@ -340,6 +340,60 @@ This procedure has successfully resolved iOS Simulator issues in the past.
 
 This section highlights the most recent major changes. For complete project history, see [CHANGELOG.md](./CHANGELOG.md).
 
+### Nested List Rendering Fix (November 2025)
+**Status:** ✅ **COMPLETE**
+
+**What Changed:**
+- Fixed critical bug where nested lists and content after list items were not displayed
+- Updated TipTap JSON parser to process ALL children of list items (not just first child)
+- Added support for rendering nested bullet lists and ordered lists
+- Added proper indentation styling for nested lists
+
+**The Problem:**
+Users reported that some notes were displaying incomplete content. The native note renderer was cutting off content after certain list items, particularly when list items contained nested lists or multiple paragraphs.
+
+**Root Cause:**
+The TipTap parser in `tiptapNativeParser.ts` only extracted the **first child** of each list item:
+```typescript
+const listItemContent = node.content?.[0]; // ❌ Only takes first child!
+```
+
+This meant if a list item had:
+1. A paragraph with text "Avoid:"
+2. A nested bulletList with items
+
+Only the paragraph would be extracted, and the nested list would be completely ignored.
+
+**Solution Implemented:**
+
+1. **Updated Parser (tiptapNativeParser.ts:147-179):**
+   - Process ALL children of list items, not just the first
+   - Extract text from all paragraphs within a list item
+   - Detect and preserve nested lists
+   - Include nested lists in the `children` property of `NativeBlock`
+
+2. **Updated Renderer (NativeNoteRenderer.tsx):**
+   - Render nested lists recursively within list items
+   - Added `depth` parameter to track nesting level
+   - Applied proper indentation styling for nested lists
+   - Support both bullet lists and ordered lists as nested content
+
+3. **Added Warning for Unknown Node Types:**
+   - Log console warning when encountering unsupported TipTap node types
+   - Helps debug future content rendering issues
+
+**Files Modified:**
+- `src/utils/tiptapNativeParser.ts` - Fixed list item parsing to handle all children
+- `src/components/notes/NativeNoteRenderer.tsx` - Added nested list rendering support
+
+**Impact:**
+- ✅ All note content now displays correctly
+- ✅ Nested lists render with proper indentation
+- ✅ Complex document structures (like medical notes with nested lists) work perfectly
+- ✅ No more missing content after list items
+
+---
+
 ### Editor Toolbar & Keyboard Scrolling Improvements (January 2025)
 **Status:** ✅ **COMPLETE**
 

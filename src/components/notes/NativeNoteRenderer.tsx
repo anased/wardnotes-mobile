@@ -34,16 +34,16 @@ export default function NativeNoteRenderer({ content }: NativeNoteRendererProps)
   );
 }
 
-function renderBlock(block: NativeBlock, index: number): React.ReactNode {
+function renderBlock(block: NativeBlock, index: number | string, depth: number = 0): React.ReactNode {
   switch (block.type) {
     case 'heading':
       return renderHeading(block, index);
     case 'paragraph':
       return renderParagraph(block, index);
     case 'bulletList':
-      return renderBulletList(block, index);
+      return renderBulletList(block, index, depth);
     case 'orderedList':
-      return renderOrderedList(block, index);
+      return renderOrderedList(block, index, depth);
     case 'blockquote':
       return renderBlockquote(block, index);
     case 'codeBlock':
@@ -53,7 +53,7 @@ function renderBlock(block: NativeBlock, index: number): React.ReactNode {
   }
 }
 
-function renderHeading(block: NativeBlock, key: number): React.ReactNode {
+function renderHeading(block: NativeBlock, key: number | string): React.ReactNode {
   const level = block.level || 1;
   const styleKey = `h${level}` as keyof typeof styles;
 
@@ -64,7 +64,7 @@ function renderHeading(block: NativeBlock, key: number): React.ReactNode {
   );
 }
 
-function renderParagraph(block: NativeBlock, key: number): React.ReactNode {
+function renderParagraph(block: NativeBlock, key: number | string): React.ReactNode {
   if (block.segments.length === 0 || (block.segments.length === 1 && !block.segments[0].text)) {
     // Empty paragraph - render small space
     return <View key={key} style={styles.emptyParagraph} />;
@@ -77,37 +77,53 @@ function renderParagraph(block: NativeBlock, key: number): React.ReactNode {
   );
 }
 
-function renderBulletList(block: NativeBlock, key: number): React.ReactNode {
+function renderBulletList(block: NativeBlock, key: number | string, depth: number = 0): React.ReactNode {
   return (
-    <View key={key} style={styles.list}>
+    <View key={key} style={[styles.list, depth > 0 && styles.nestedList]}>
       {block.children?.map((item, index) => (
-        <View key={index} style={styles.listItem}>
-          <Text style={styles.bullet}>•</Text>
-          <Text style={styles.listItemText}>
-            {renderTextSegments(item.segments)}
-          </Text>
+        <View key={index}>
+          <View style={styles.listItem}>
+            <Text style={styles.bullet}>•</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listItemText}>
+                {renderTextSegments(item.segments)}
+              </Text>
+              {/* Render nested lists if they exist */}
+              {item.children?.map((nestedBlock, nestedIndex) =>
+                renderBlock(nestedBlock, `${key}-${index}-${nestedIndex}`, depth + 1)
+              )}
+            </View>
+          </View>
         </View>
       ))}
     </View>
   );
 }
 
-function renderOrderedList(block: NativeBlock, key: number): React.ReactNode {
+function renderOrderedList(block: NativeBlock, key: number | string, depth: number = 0): React.ReactNode {
   return (
-    <View key={key} style={styles.list}>
+    <View key={key} style={[styles.list, depth > 0 && styles.nestedList]}>
       {block.children?.map((item, index) => (
-        <View key={index} style={styles.listItem}>
-          <Text style={styles.bullet}>{index + 1}.</Text>
-          <Text style={styles.listItemText}>
-            {renderTextSegments(item.segments)}
-          </Text>
+        <View key={index}>
+          <View style={styles.listItem}>
+            <Text style={styles.bullet}>{index + 1}.</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listItemText}>
+                {renderTextSegments(item.segments)}
+              </Text>
+              {/* Render nested lists if they exist */}
+              {item.children?.map((nestedBlock, nestedIndex) =>
+                renderBlock(nestedBlock, `${key}-${index}-${nestedIndex}`, depth + 1)
+              )}
+            </View>
+          </View>
         </View>
       ))}
     </View>
   );
 }
 
-function renderBlockquote(block: NativeBlock, key: number): React.ReactNode {
+function renderBlockquote(block: NativeBlock, key: number | string): React.ReactNode {
   return (
     <View key={key} style={styles.blockquoteContainer}>
       <View style={styles.blockquoteBorder} />
@@ -118,7 +134,7 @@ function renderBlockquote(block: NativeBlock, key: number): React.ReactNode {
   );
 }
 
-function renderCodeBlock(block: NativeBlock, key: number): React.ReactNode {
+function renderCodeBlock(block: NativeBlock, key: number | string): React.ReactNode {
   return (
     <View key={key} style={styles.codeBlockContainer}>
       <Text style={styles.codeBlock}>
@@ -248,6 +264,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 4,
     paddingLeft: 8,
+  },
+  nestedList: {
+    marginLeft: 20,
+    marginTop: 4,
   },
   bullet: {
     fontSize: 16,

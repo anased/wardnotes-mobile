@@ -2,8 +2,8 @@
 // Provides native-feeling typography and full TipTap feature support
 // Uses the same mobile-optimized CSS as the editor for consistency
 
-import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { RichText, useEditorBridge } from '@10play/tentap-editor';
 import { MOBILE_TYPOGRAPHY_CSS } from '../../constants/editorStyles';
 import { convertTipTapToHtml } from '../../utils/tiptapConverter';
@@ -13,6 +13,8 @@ interface TipTapViewerProps {
 }
 
 export default function TipTapViewer({ content }: TipTapViewerProps) {
+  const [isReady, setIsReady] = useState(false);
+
   // Convert TipTap JSON to HTML for display (workaround for 10tap-editor initialization)
   const contentHtml = React.useMemo(() => {
     if (!content) return '';
@@ -25,6 +27,7 @@ export default function TipTapViewer({ content }: TipTapViewerProps) {
 
       // Convert TipTap JSON to HTML
       const html = convertTipTapToHtml(content);
+      console.log('TipTapViewer - Converted to HTML:', html);
       return html;
     } catch (error) {
       console.error('TipTapViewer - Error converting TipTap to HTML:', error);
@@ -56,22 +59,35 @@ export default function TipTapViewer({ content }: TipTapViewerProps) {
             retries++;
             if (retries >= maxRetries) {
               console.error('TipTapViewer - Failed to initialize after max retries:', error);
-              break;
+              setIsReady(true); // Show content anyway
+              return;
             }
             await new Promise<void>(resolve => setTimeout(resolve, 500));
           }
         }
 
         // Inject mobile typography CSS
-        editor.injectCSS(MOBILE_TYPOGRAPHY_CSS, 'mobile-typography');
+        await editor.injectCSS(MOBILE_TYPOGRAPHY_CSS, 'mobile-typography');
         console.log('✅ TipTapViewer - Mobile typography CSS injected');
+
+        // Mark as ready
+        setIsReady(true);
       } catch (error: any) {
         console.error('TipTapViewer - Error initializing:', error);
+        setIsReady(true); // Show content anyway
       }
     };
 
     initializeViewer();
   }, [editor]);
+
+  if (!isReady) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0ea5e9" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -86,6 +102,12 @@ export default function TipTapViewer({ content }: TipTapViewerProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'transparent',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: 'transparent',
   },
   viewer: {

@@ -14,7 +14,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { Ionicons } from '@expo/vector-icons';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
-import NativeNoteRenderer from '../../components/notes/NativeNoteRenderer';
+import TipTapViewer from '../../components/notes/TipTapViewer';
 import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
 import NoteFlashcards from '../../components/notes/NoteFlashcards';
 import FlashcardGeneratorModal from '../../components/flashcards/FlashcardGeneratorModal';
@@ -288,7 +288,7 @@ export default function NoteDetailScreen() {
 
         <View style={styles.contentContainer}>
           {note.content ? (
-            <NativeNoteRenderer content={note.content} />
+            <TipTapViewer content={note.content} />
           ) : (
             <View style={styles.noContentContainer}>
               <Ionicons name="document-outline" size={48} color="#d1d5db" />

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { RichText, Toolbar, useEditorBridge } from '@10play/tentap-editor';
 import { convertTipTapToHtml } from '../../utils/tiptapConverter';
 import { MOBILE_TYPOGRAPHY_CSS } from '../../constants/editorStyles';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 interface TipTapEditorProps {
   initialContent?: any;
@@ -211,12 +213,25 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
   }), [editor, forceContentUpdate]);
 
   if (!editable) {
-    // Read-only mode - no toolbar needed
+    // Read-only mode - inject CSS directly via WebView JavaScript
+    const injectedCSS = `
+      (function() {
+        const style = document.createElement('style');
+        style.id = 'mobile-typography-viewer';
+        style.innerHTML = \`${MOBILE_TYPOGRAPHY_CSS}\`;
+        document.head.appendChild(style);
+        console.log('✅ Mobile typography CSS injected in viewer via JavaScript');
+      })();
+      true; // Required for injectedJavaScript
+    `;
+
     return (
       <View style={[styles.container, styles.readOnlyContainer]}>
         <RichText
           editor={editor}
           style={[styles.editor, styles.readOnlyEditor]}
+          scrollEnabled={false}
+          injectedJavaScript={injectedCSS}
         />
       </View>
     );
@@ -291,5 +306,7 @@ const styles = StyleSheet.create({
   readOnlyEditor: {
     backgroundColor: 'transparent',
     paddingHorizontal: 0,
+    minHeight: 300, // Minimum height for short content
+    // No maxHeight - allow content to grow naturally
   },
 });

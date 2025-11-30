@@ -3,6 +3,11 @@
 // This CSS is injected into the WebView to provide native-feeling typography
 
 export const MOBILE_TYPOGRAPHY_CSS = `
+  /* CRITICAL: Force iOS system font on ALL elements */
+  * {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  }
+
   /* Base body styles - match iOS system font */
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
@@ -11,6 +16,29 @@ export const MOBILE_TYPOGRAPHY_CSS = `
     text-size-adjust: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Disable internal scrolling in read-only mode */
+  .ProseMirror {
+    overflow: visible !important;
+    height: auto !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  }
+
+  /* Ensure font applies to all TipTap elements */
+  .ProseMirror *,
+  .ProseMirror p,
+  .ProseMirror div,
+  .ProseMirror span,
+  .ProseMirror li,
+  .ProseMirror h1,
+  .ProseMirror h2,
+  .ProseMirror h3,
+  .ProseMirror h4,
+  .ProseMirror h5,
+  .ProseMirror h6 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    color: #1f2937 !important;
   }
 
   /* Mobile-optimized heading sizes - match native exactly */

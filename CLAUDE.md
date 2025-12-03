@@ -776,6 +776,60 @@ Add these redirect URIs in Supabase Dashboard → Authentication → URL Configu
 
 ---
 
+### Smart Flashcard Generation Update (December 2025)
+**Status:** ✅ **COMPLETE**
+
+**What Changed:**
+- Updated mobile app to use new two-stage smart flashcard generation API
+- Added support for new card metadata (type, importance, sourceContext)
+- Added optional semantic deduplication parameter
+- Full backward compatibility with existing save workflow
+
+**Technical Updates:**
+
+1. **Updated Type Definitions** (`src/types/flashcardGeneration.ts`):
+   - `GeneratedCard` now includes:
+     - `type`: Card category (definition, mechanism, clinical_pearl, differential, treatment, diagnostic)
+     - `importance`: Priority level (high, medium, low)
+     - `sourceContext`: Optional context about what the card tests
+   - `GenerateFlashcardsRequest` now supports optional `enable_deduplication` parameter
+   - `GenerateFlashcardsResponse` now includes optional `metadata` with generation stats
+
+2. **Updated API Service** (`src/services/flashcardGeneration.ts`):
+   - `generateFlashcardsPreview()` accepts optional `enableDeduplication` parameter (default: false)
+   - `generateAndSaveFlashcards()` accepts optional `enableDeduplication` parameter (default: false)
+   - Both functions pass `enable_deduplication` to web API endpoint
+
+3. **Backward Compatibility:**
+   - Save workflow unchanged - still only sends `front`, `back`, `cloze` fields
+   - New metadata fields (`type`, `importance`, `sourceContext`) are available during preview but not saved
+   - Existing mobile UI continues to work without modifications
+   - No breaking changes to user experience
+
+**API Behavior:**
+- **Without deduplication** (default): Generates high-quality cards using two-stage AI analysis
+- **With deduplication** (optional): Additionally removes semantically similar cards using embeddings
+- Mobile app can enable deduplication by passing `true` as 5th parameter to generation functions
+
+**Files Modified:**
+- `src/types/flashcardGeneration.ts` - Updated GeneratedCard and request/response types
+- `src/services/flashcardGeneration.ts` - Added enableDeduplication parameter support
+
+**Web App Integration:**
+Uses identical API endpoint as web app (`/api/flashcards/generate-from-note`) which now:
+- Stage 1: Analyzes note content for key terms, relationships, and clinical pearls
+- Stage 2: Generates targeted cards based on analysis with importance ranking
+- Stage 3: Optionally deduplicates using semantic similarity (if enabled)
+
+**Cost Per Generation:**
+- ~$0.021 per note (10 cards)
+- ~238 notes for $5 (~2,380 flashcards)
+- Deduplication adds negligible cost (~$0.000015)
+
+**Impact:** Mobile app now benefits from improved AI flashcard generation with better quality, prioritization, and consistency with web app.
+
+---
+
 ### Flashcard Management & Editing (November 2025)
 **Status:** ✅ **COMPLETE**
 

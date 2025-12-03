@@ -36,7 +36,8 @@ export async function generateFlashcardsPreview(
   noteId: string,
   cardType: 'cloze' | 'front_back',
   deckId: string,
-  maxCards: number = 10
+  maxCards: number = 10,
+  enableDeduplication: boolean = false
 ): Promise<GeneratedCard[]> {
   try {
     const token = await getAuthToken();
@@ -47,6 +48,7 @@ export async function generateFlashcardsPreview(
       deck_id: deckId,
       max_cards: maxCards,
       preview: true, // Preview mode - don't save to database
+      enable_deduplication: enableDeduplication,
     };
 
     const response = await fetch(`${WEB_APP_URL}/api/flashcards/generate-from-note`, {
@@ -133,7 +135,8 @@ export async function generateAndSaveFlashcards(
   noteId: string,
   cardType: 'cloze' | 'front_back',
   deckId: string,
-  maxCards: number = 10
+  maxCards: number = 10,
+  enableDeduplication: boolean = false
 ): Promise<any[]> {
   try {
     const token = await getAuthToken();
@@ -144,6 +147,7 @@ export async function generateAndSaveFlashcards(
       deck_id: deckId,
       max_cards: maxCards,
       preview: false, // Direct save mode
+      enable_deduplication: enableDeduplication,
     };
 
     const response = await fetch(`${WEB_APP_URL}/api/flashcards/generate-from-note`, {

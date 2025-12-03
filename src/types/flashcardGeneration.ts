@@ -10,17 +10,27 @@ export interface GenerateFlashcardsRequest {
   deck_id: string;
   max_cards: number;
   preview: boolean;
+  enable_deduplication?: boolean; // Optional: enables semantic deduplication (default: false)
 }
 
 export interface GeneratedCard {
   front?: string;
   back?: string;
   cloze?: string;
+  type: 'definition' | 'mechanism' | 'clinical_pearl' | 'differential' | 'treatment' | 'diagnostic';
+  importance: 'high' | 'medium' | 'low';
+  sourceContext?: string;
 }
 
 export interface GenerateFlashcardsResponse {
   cards: GeneratedCard[];
   preview: boolean;
+  metadata?: {
+    generationTime: number;
+    totalGenerated: number;
+    cardTypes: Record<string, number>;
+    importanceLevels: Record<string, number>;
+  };
 }
 
 export interface SaveFlashcardsRequest {

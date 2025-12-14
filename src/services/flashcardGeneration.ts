@@ -62,6 +62,16 @@ export async function generateFlashcardsPreview(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+
+      // Extract quota information from 429 errors
+      if (response.status === 429 && errorData.quota) {
+        throw createGenerationError(
+          errorData.message || errorData.error || 'Quota exceeded',
+          response.status,
+          errorData.quota
+        );
+      }
+
       throw createGenerationError(
         errorData.error || `Failed to generate flashcards (${response.status})`,
         response.status
@@ -179,11 +189,15 @@ export async function generateAndSaveFlashcards(
 /**
  * Creates a structured error object
  */
-function createGenerationError(message: string, statusCode?: number): GenerationError {
+function createGenerationError(message: string, statusCode?: number, quota?: any): GenerationError {
   let type: GenerationError['type'] = 'unknown';
   let retryable = true;
 
-  if (statusCode === 401 || statusCode === 403) {
+  if (statusCode === 429) {
+    type = 'quota_exceeded';
+    retryable = false;
+    message = message || 'Quota exceeded. Please upgrade or wait until next month.';
+  } else if (statusCode === 401 || statusCode === 403) {
     type = 'api';
     retryable = false;
     message = 'Authentication failed. Please sign in again.';
@@ -199,7 +213,13 @@ function createGenerationError(message: string, statusCode?: number): Generation
     message = 'Unable to connect. Check your internet connection.';
   }
 
-  return { message, type, retryable };
+  return {
+    message,
+    type,
+    retryable,
+    status: statusCode,
+    quota: quota
+  };
 }
 
 /**

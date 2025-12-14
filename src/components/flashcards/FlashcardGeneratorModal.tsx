@@ -25,6 +25,9 @@ import type {
 } from '../../types/flashcardGeneration';
 import DeckCreationModal from './DeckCreationModal';
 import FlashcardPreviewScreen from './FlashcardPreviewScreen';
+import { useQuota } from '../../hooks/useQuota';
+import { useSubscription } from '../../hooks/useSubscription';
+import InlineQuotaIndicator from '../premium/InlineQuotaIndicator';
 
 interface FlashcardGeneratorModalProps {
   visible: boolean;
@@ -43,6 +46,10 @@ export default function FlashcardGeneratorModal({
   onClose,
   onSuccess,
 }: FlashcardGeneratorModalProps) {
+  // Quota and subscription hooks
+  const { quota, refreshQuota, getRemainingUses } = useQuota();
+  const { isPremium, redirectToCheckout } = useSubscription();
+
   // Configuration state
   const [cardType, setCardType] = useState<FlashcardType>('cloze');
   const [selectedDeckId, setSelectedDeckId] = useState<string>('');
@@ -130,7 +137,35 @@ export default function FlashcardGeneratorModal({
       setStatus('preview');
     } catch (err: any) {
       console.error('Error generating flashcards:', err);
-      setError(err.message || 'Failed to generate flashcards. Please try again.');
+
+      // Check if it's a quota exceeded error (429)
+      if (err.message?.includes('Quota exceeded') || err.type === 'quota_exceeded' || err.status === 429) {
+        const daysRemaining = quota?.period.daysRemaining || 0;
+        const limit = quota?.flashcard_generation.limit || 3;
+
+        Alert.alert(
+          'Monthly Limit Reached',
+          `You've used all ${limit} free flashcard generations this month. Your quota resets in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}.`,
+          [
+            {
+              text: 'Upgrade to Premium',
+              onPress: async () => {
+                try {
+                  await redirectToCheckout();
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to start upgrade process');
+                }
+              },
+            },
+            { text: 'OK', style: 'cancel' },
+          ]
+        );
+
+        setError('Monthly flashcard generation limit reached.');
+      } else {
+        setError(err.message || 'Failed to generate flashcards. Please try again.');
+      }
+
       setStatus('error');
     }
   };
@@ -161,14 +196,23 @@ export default function FlashcardGeneratorModal({
         cardType
       );
 
+      // Refresh quota to show updated usage
+      await refreshQuota();
+
       setStatus('success');
+
+      // Get remaining uses for success message
+      const remaining = getRemainingUses('flashcard_generation');
+      const remainingText = remaining !== null
+        ? `\n\nYou have ${remaining} free generation${remaining !== 1 ? 's' : ''} remaining this month.`
+        : '';
 
       // Show success message
       Alert.alert(
         'Success!',
         `${selectedCards.length} flashcard${
           selectedCards.length === 1 ? '' : 's'
-        } saved successfully.`,
+        } saved successfully.${!isPremium ? remainingText : ''}`,
         [
           {
             text: 'OK',
@@ -391,8 +435,13 @@ export default function FlashcardGeneratorModal({
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
-            <View>
-              <Text style={styles.headerTitle}>Generate Flashcards</Text>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.headerTitle}>Generate Flashcards</Text>
+                {!isPremium && quota && (
+                  <InlineQuotaIndicator featureType="flashcard_generation" />
+                )}
+              </View>
               <Text style={styles.headerSubtitle} numberOfLines={1}>
                 {noteTitle}
               </Text>

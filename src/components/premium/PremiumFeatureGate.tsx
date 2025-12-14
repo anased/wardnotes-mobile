@@ -9,12 +9,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../../hooks/useSubscription';
+import { useQuota } from '../../hooks/useQuota';
+import type { QuotaFeatureType } from '../../types/quota';
 
 interface PremiumFeatureGateProps {
   children: ReactNode;
   featureName: string;
   description: string;
   onPress?: () => void;
+  featureType?: QuotaFeatureType;  // NEW - enables soft paywall
+  onQuotaExhausted?: () => void;   // NEW - callback when quota exhausted
 }
 
 export default function PremiumFeatureGate({
@@ -22,15 +26,29 @@ export default function PremiumFeatureGate({
   featureName,
   description,
   onPress,
+  featureType,
+  onQuotaExhausted,
 }: PremiumFeatureGateProps) {
   const [showModal, setShowModal] = React.useState(false);
   const { isPremium, redirectToCheckout } = useSubscription();
+  const { quota, canUseFeature } = useQuota();
 
+  // 1. Premium users: full access (unchanged)
   if (isPremium) {
     return <>{children}</>;
   }
 
+  // 2. Free users with quota available: allow access (NEW - soft paywall)
+  if (featureType && quota && canUseFeature(featureType)) {
+    return <>{children}</>;
+  }
+
+  // 3. Quota exhausted or no featureType: show paywall
+
   const handlePremiumFeaturePress = () => {
+    if (onQuotaExhausted) {
+      onQuotaExhausted();
+    }
     setShowModal(true);
   };
 
@@ -41,6 +59,22 @@ export default function PremiumFeatureGate({
     } catch (error) {
       Alert.alert('Error', 'Failed to start upgrade process');
     }
+  };
+
+  // Get quota info for display
+  const getQuotaMessage = (): string | null => {
+    if (!featureType || !quota) {
+      return null;
+    }
+
+    const feature = quota[featureType];
+    const daysRemaining = quota.period.daysRemaining;
+
+    if (feature.limit !== null) {
+      return `You've used ${feature.used}/${feature.limit} free uses this month. Resets in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}.`;
+    }
+
+    return null;
   };
 
   return (
@@ -75,6 +109,11 @@ export default function PremiumFeatureGate({
               <Ionicons name="flash" size={32} color="#0ea5e9" />
               <Text style={styles.modalTitle}>{featureName}</Text>
               <Text style={styles.modalDescription}>{description}</Text>
+              {getQuotaMessage() && (
+                <View style={styles.quotaMessageContainer}>
+                  <Text style={styles.quotaMessage}>{getQuotaMessage()}</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.featuresList}>
@@ -213,5 +252,18 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#6b7280',
     fontSize: 16,
+  },
+  quotaMessageContainer: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    width: '100%',
+  },
+  quotaMessage: {
+    fontSize: 13,
+    color: '#92400e',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

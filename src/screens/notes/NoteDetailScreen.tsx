@@ -14,8 +14,11 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { Ionicons } from '@expo/vector-icons';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
+import { useQuota } from '../../hooks/useQuota';
+import { useSubscription } from '../../hooks/useSubscription';
 import TipTapEditor from '../../components/notes/TipTapEditor';
 import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
+import InlineQuotaIndicator from '../../components/premium/InlineQuotaIndicator';
 import NoteFlashcards from '../../components/notes/NoteFlashcards';
 import FlashcardGeneratorModal from '../../components/flashcards/FlashcardGeneratorModal';
 import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
@@ -35,6 +38,8 @@ export default function NoteDetailScreen() {
 
   const { fetchNoteById, removeNote } = useNotes();
   const { categories } = useCategories();
+  const { quota } = useQuota();
+  const { isPremium } = useSubscription();
 
   useFocusEffect(
     useCallback(() => {
@@ -215,15 +220,23 @@ export default function NoteDetailScreen() {
         
         <View style={styles.headerActions}>
           <PremiumFeatureGate
+            featureType="flashcard_generation"
             featureName="AI Flashcard Generator"
             description="Generate Anki-compatible flashcards from this note to boost your learning efficiency."
           >
-            <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={handleGenerateFlashcards}
-            >
-              <Ionicons name="flash-outline" size={20} color="#0ea5e9" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleGenerateFlashcards}
+              >
+                <Ionicons name="flash-outline" size={20} color="#0ea5e9" />
+              </TouchableOpacity>
+              {!isPremium && quota && (
+                <View style={{ marginLeft: -8 }}>
+                  <InlineQuotaIndicator featureType="flashcard_generation" />
+                </View>
+              )}
+            </View>
           </PremiumFeatureGate>
           
           <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>

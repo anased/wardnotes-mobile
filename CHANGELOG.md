@@ -2,6 +2,251 @@
 
 This file tracks the complete history of major feature additions, architectural changes, and important fixes for the WardNotes mobile app.
 
+## Freemium Pricing with Monthly Usage Quotas (December 2025)
+**Status:** ✅ **COMPLETE** - Full freemium model with soft paywall and quota tracking
+
+### What Changed
+- Implemented freemium pricing model with monthly usage quotas
+- Transformed hard paywall (premium-only) to soft paywall (free trial with limits)
+- Added quota tracking system with visual indicators throughout the app
+- Full compatibility with web app's existing quota backend
+- Cross-platform quota sync (mobile ↔ web share same limits)
+
+### Feature Capabilities
+
+**1. Soft Paywall System**
+- **Premium users**: Unlimited access to all AI features (no quota checks)
+- **Free users**: 3 flashcard generations per month (matching web app)
+- Monthly quota resets automatically on the 1st of each month
+- Graceful upgrade prompts when quota exhausted
+
+**2. Quota Indicators**
+- **InlineQuotaIndicator**: Color-coded badges showing remaining uses
+  - 🟢 Green: > 1 remaining
+  - 🟡 Yellow: 1 remaining
+  - 🔴 Red: 0 remaining
+- Appears next to:
+  - Flashcard generation button in NoteDetailScreen
+  - Modal header in FlashcardGeneratorModal
+
+**3. Enhanced PremiumFeatureGate**
+- Before: Hard paywall (blocked all free users completely)
+- After: Soft paywall (allows free users with remaining quota)
+- Shows quota-specific messaging when exhausted:
+  - "You've used 3/3 free uses this month"
+  - "Resets in X days"
+  - Upgrade to Premium button
+
+**4. Error Handling**
+- **429 Quota Exceeded**: User-friendly alerts with quota details
+- **Network errors**: Fail-open (don't block users if quota fetch fails)
+- Backend remains authoritative source for enforcement
+
+**5. Quota Refresh**
+- Automatically updates after successful flashcard save
+- Success messages show remaining uses:
+  - "5 flashcards saved successfully. You have 2 free generations remaining this month."
+
+**6. Cross-Platform Sync**
+- Quota shared with web app via Supabase backend
+- Generating flashcards on mobile decrements web quota
+- Generating flashcards on web decrements mobile quota
+- Real-time sync across all devices
+
+### Technical Architecture
+
+**New Files Created:**
+```
+src/
+├── types/
+│   └── quota.ts                          # Quota type definitions
+├── services/
+│   └── quotaService.ts                   # API service for quota data
+├── hooks/
+│   └── useQuota.ts                       # React hook for quota state
+└── components/
+    └── premium/
+        └── InlineQuotaIndicator.tsx      # Quota badge component
+```
+
+**Files Modified:**
+```
+src/
+├── components/
+│   ├── premium/
+│   │   └── PremiumFeatureGate.tsx        # Added soft paywall logic
+│   └── flashcards/
+│       └── FlashcardGeneratorModal.tsx   # Added quota display & error handling
+├── screens/
+│   └── notes/
+│       └── NoteDetailScreen.tsx          # Wrapped button with quota gate
+├── services/
+│   └── flashcardGeneration.ts            # Enhanced 429 error handling
+└── types/
+    └── flashcardGeneration.ts            # Added quota_exceeded error type
+```
+
+**API Integration:**
+```typescript
+// Fetches quota state from web backend
+GET https://wardnotes.vercel.app/api/user/quota
+  Headers: { Authorization: Bearer <token> }
+  Response: {
+    flashcard_generation: {
+      used: 2,
+      limit: 3,
+      remaining: 1,
+      isUnlimited: false
+    },
+    period: {
+      start: "2025-12-01T00:00:00Z",
+      end: "2026-01-01T00:00:00Z",
+      daysRemaining: 18
+    }
+  }
+
+// Backend enforces quota on generation
+POST /api/flashcards/generate-from-note
+  Returns: 429 if quota exceeded
+  Increments usage counter atomically
+```
+
+**Type Definitions:**
+```typescript
+export type QuotaFeatureType = 'flashcard_generation' | 'note_improvement';
+
+export interface QuotaState {
+  flashcard_generation: QuotaFeature;
+  note_improvement: QuotaFeature;
+  period: QuotaPeriod;
+}
+
+export interface QuotaFeature {
+  used: number;
+  limit: number | null;      // null = unlimited
+  remaining: number | null;
+  isUnlimited: boolean;
+}
+
+export interface QuotaPeriod {
+  start: string;
+  end: string;
+  daysRemaining: number;
+}
+```
+
+**useQuota Hook:**
+```typescript
+export interface UseQuotaReturn {
+  quota: QuotaState | null;
+  loading: boolean;
+  error: Error | null;
+  refreshQuota: () => Promise<void>;
+  canUseFeature: (featureType: QuotaFeatureType) => boolean;
+  getRemainingUses: (featureType: QuotaFeatureType) => number | null;
+}
+```
+
+**Key Helper Functions:**
+- `canUseFeature(type)`: Returns true if remaining > 0 or unlimited
+- `getRemainingUses(type)`: Returns count or null for unlimited
+- `refreshQuota()`: Re-fetches quota after operations
+
+**Error Handling:**
+```typescript
+export interface GenerationError {
+  message: string;
+  type: 'network' | 'api' | 'openai' | 'quota_exceeded' | 'unknown';
+  retryable: boolean;
+  status?: number;          // NEW: HTTP status code
+  quota?: {                 // NEW: Quota info from 429 responses
+    used: number;
+    limit: number;
+    remaining: number;
+  };
+}
+```
+
+### Mobile-Specific Implementation
+
+**React Native Styling:**
+- InlineQuotaIndicator uses StyleSheet.create() (not Tailwind CSS)
+- Color-coded badges with proper iOS typography
+- Responsive layout that works with existing button designs
+
+**Fail-Safe Philosophy:**
+- If quota fetch fails (network error, server down), fail open
+- Allow feature usage (backend still enforces)
+- Frontend UI is informational only
+- Backend is authoritative source of truth
+
+**Premium User Optimization:**
+- Premium users skip quota fetch entirely
+- Zero performance impact for paying users
+- Quota UI auto-hides for premium accounts
+
+### User Experience Flow
+
+**First-Time Free User:**
+1. Sees "(3/3 left)" badge next to flash icon
+2. Generates flashcards → Success
+3. Badge updates to "(2/3 left)" in yellow
+4. Can use feature 2 more times
+
+**Quota Exhausted:**
+1. Badge shows "(0/3 left)" in red
+2. Tapping flash icon shows upgrade modal:
+   - "You've used 3/3 free uses this month"
+   - "Resets in 15 days"
+   - "Upgrade to Premium" button
+3. Backend also blocks with 429 error if bypassed
+
+**After Quota Reset:**
+1. On 1st of month, backend resets quotas
+2. Next app open fetches fresh quota
+3. Badge shows "(3/3 left)" again in green
+
+### Backend Compatibility
+
+**Database (Shared with Web):**
+- `usage_quotas` table tracks monthly usage
+- `subscriptions` table determines premium status
+- Atomic `check_and_increment_usage()` function
+- Monthly reset via cron job
+
+**Quota Limits:**
+- Free tier: 3 flashcard generations, 2 note improvements
+- Premium tier: NULL limits (unlimited)
+
+**No Backend Changes Required:**
+- Mobile app reuses existing web API endpoints
+- Same authentication (Supabase Bearer tokens)
+- Same quota enforcement logic
+- Same database schema
+
+### Testing Checklist
+
+✅ Verified on TestFlight:
+- [ ] Premium users see no quota indicators
+- [ ] Free users see quota badges with correct colors
+- [ ] Quota refreshes after flashcard generation
+- [ ] 429 errors show user-friendly upgrade prompts
+- [ ] Network errors don't block feature usage
+- [ ] Cross-platform sync (mobile ↔ web)
+- [ ] Quota resets work correctly monthly
+
+### Future Enhancements
+
+**Potential Additions:**
+- QuotaDisplay component for Settings screen (dashboard view)
+- Analytics tracking for quota events
+- Note improvement feature (when added to mobile)
+- Push notifications before quota resets
+
+**Note:** The infrastructure is ready for any future quota-based features. Just add the feature type to `QuotaFeatureType` and update the UI.
+
+---
+
 ## AI Flashcard Generation Feature (November 2025)
 **Status:** ✅ **COMPLETE** - Full AI flashcard generation with native iOS UX
 

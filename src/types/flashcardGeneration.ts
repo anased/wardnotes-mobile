@@ -85,6 +85,12 @@ export interface GenerationState {
 
 export interface GenerationError {
   message: string;
-  type: 'network' | 'api' | 'openai' | 'unknown';
+  type: 'network' | 'api' | 'openai' | 'quota_exceeded' | 'unknown';
   retryable: boolean;
+  status?: number;  // HTTP status code
+  quota?: {         // Quota info from 429 responses
+    used: number;
+    limit: number;
+    remaining: number;
+  };
 }

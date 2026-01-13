@@ -218,7 +218,7 @@ export class FlashcardService {
   
   static async createFlashcard(request: CreateFlashcardRequest): Promise<Flashcard> {
     const user = await this.getAuthenticatedUser();
-    
+
     const { data, error } = await supabase
       .from('flashcards')
       .insert({
@@ -238,9 +238,49 @@ export class FlashcardService {
         correct_reviews: 0,
         user_id: user.id
       });
-    
+
     if (error) throw error;
     return Array.isArray(data) ? data[0] : data;
+  }
+
+  // Manual flashcard creation - wrapper for createFlashcard with validation
+  static async createManualFlashcard(
+    noteId: string,
+    deckId: string,
+    cardType: 'cloze' | 'front_back',
+    frontContent?: string,
+    backContent?: string,
+    clozeContent?: string,
+    tags?: string[]
+  ): Promise<Flashcard> {
+    // Validation
+    if (!deckId) {
+      throw new Error('Deck ID is required');
+    }
+
+    if (cardType === 'cloze') {
+      if (!clozeContent || !clozeContent.trim()) {
+        throw new Error('Cloze content is required for cloze cards');
+      }
+    } else {
+      if (!frontContent || !frontContent.trim()) {
+        throw new Error('Front content is required for front/back cards');
+      }
+      if (!backContent || !backContent.trim()) {
+        throw new Error('Back content is required for front/back cards');
+      }
+    }
+
+    // Use the existing createFlashcard method
+    return this.createFlashcard({
+      deck_id: deckId,
+      note_id: noteId,
+      card_type: cardType,
+      front_content: frontContent,
+      back_content: backContent,
+      cloze_content: clozeContent,
+      tags: tags || [],
+    });
   }
   
   static async updateFlashcard(id: string, request: UpdateFlashcardRequest): Promise<Flashcard> {
@@ -366,6 +406,98 @@ export class FlashcardService {
     // Combine and shuffle
     const allCards = [...dueCards, ...newCards];
     return allCards.sort(() => Math.random() - 0.5);
+  }
+
+  // Custom study with tag filtering
+  static async getCustomStudyCards(
+    deckId: string,
+    tags?: string[],
+    dueOnly: boolean = true,
+    limit: number = 50
+  ): Promise<Flashcard[]> {
+    const user = await this.getAuthenticatedUser();
+
+    let query = supabase
+      .from('flashcards')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('deck_id', deckId)
+      .neq('status', 'suspended');
+
+    // Apply tag filtering with OR logic (cards with ANY of the selected tags)
+    if (tags && tags.length > 0) {
+      query = query.overlaps('tags', tags);
+    }
+
+    // Apply due-only filter
+    if (dueOnly) {
+      query = query.lte('next_review', new Date().toISOString());
+    }
+
+    query = query
+      .order('next_review', { ascending: true })
+      .limit(limit);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  // Get count of cards matching custom study criteria (for live preview)
+  static async getCustomStudyCount(
+    deckId: string,
+    tags?: string[],
+    dueOnly: boolean = true
+  ): Promise<number> {
+    const user = await this.getAuthenticatedUser();
+
+    let query = supabase
+      .from('flashcards')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('deck_id', deckId)
+      .neq('status', 'suspended');
+
+    // Apply tag filtering
+    if (tags && tags.length > 0) {
+      query = query.overlaps('tags', tags);
+    }
+
+    // Apply due-only filter
+    if (dueOnly) {
+      query = query.lte('next_review', new Date().toISOString());
+    }
+
+    const { count, error } = await query;
+    if (error) throw error;
+    return count || 0;
+  }
+
+  // Get all unique tags from user's flashcards (for autocomplete)
+  static async getFlashcardTags(): Promise<string[]> {
+    const user = await this.getAuthenticatedUser();
+
+    const { data, error } = await supabase
+      .from('flashcards')
+      .select('tags')
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    // Flatten and deduplicate tags
+    const allTags = new Set<string>();
+    data?.forEach((flashcard) => {
+      if (flashcard.tags && Array.isArray(flashcard.tags)) {
+        flashcard.tags.forEach((tag: string) => {
+          if (tag && tag.trim()) {
+            allTags.add(tag.trim());
+          }
+        });
+      }
+    });
+
+    // Convert to sorted array
+    return Array.from(allTags).sort((a, b) => a.localeCompare(b));
   }
 
   // ======================

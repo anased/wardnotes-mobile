@@ -2,6 +2,7 @@
 import { StackNavigationProp } from '@react-navigation/stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp, RouteProp } from '@react-navigation/native';
+import type { Flashcard } from './flashcard';
 
 // Define the parameter lists for our navigators
 export type RootStackParamList = {
@@ -15,7 +16,12 @@ export type RootStackParamList = {
   Subscription: undefined;
   // Flashcard screens
   DeckScreen: { deckId: string };
-  StudyScreen: { deckId?: string; noteId?: string; mode?: 'new' | 'review' | 'mixed' };
+  StudyScreen: {
+    deckId?: string;
+    noteId?: string;
+    mode?: 'new' | 'review' | 'mixed';
+    cards?: Flashcard[];  // NEW: Pre-fetched cards for custom study sessions
+  };
   CreateCard: { deckId?: string };
 };
 

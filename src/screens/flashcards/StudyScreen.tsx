@@ -19,7 +19,7 @@ import type { ReviewQuality, MobileStudyMode } from '../../types/flashcard';
 export default function StudyScreen() {
   const navigation = useNavigation<MainTabNavigationProp>();
   const route = useRoute<StudyScreenRouteProp>();
-  const { deckId, noteId, mode = 'mixed' } = route.params;
+  const { deckId, noteId, mode = 'mixed', cards: preFetchedCards } = route.params;
 
   const isNoteSession = !!noteId;
   const sessionId = noteId || deckId || '';
@@ -43,9 +43,11 @@ export default function StudyScreen() {
   const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
+    // For custom study with pre-fetched cards, start immediately
     // For deck sessions, wait for deck to load
     // For note sessions, start immediately
-    const canStart = isNoteSession ? !hasStarted : (deck && !hasStarted);
+    const hasPreFetchedCards = preFetchedCards && preFetchedCards.length > 0;
+    const canStart = hasPreFetchedCards ? !hasStarted : (isNoteSession ? !hasStarted : (deck && !hasStarted));
 
     if (canStart && !loading && sessionId) {
       const studyMode: MobileStudyMode = {
@@ -53,7 +55,8 @@ export default function StudyScreen() {
         card_limit: mode === 'new' ? 10 : mode === 'review' ? 30 : 20,
       };
 
-      startMobileSession(sessionId, studyMode, isNoteSession)
+      // Pass pre-fetched cards to the session (if available)
+      startMobileSession(sessionId, studyMode, isNoteSession, preFetchedCards)
         .then(() => setHasStarted(true))
         .catch((err) => {
           Alert.alert('Error', err.message, [
@@ -61,7 +64,7 @@ export default function StudyScreen() {
           ]);
         });
     }
-  }, [deck, hasStarted, loading, startMobileSession, sessionId, mode, navigation, isNoteSession]);
+  }, [deck, hasStarted, loading, startMobileSession, sessionId, mode, navigation, isNoteSession, preFetchedCards]);
 
   const handleShowAnswer = () => {
     showCardAnswer();

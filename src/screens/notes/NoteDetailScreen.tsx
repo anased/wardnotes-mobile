@@ -21,6 +21,7 @@ import PremiumFeatureGate from '../../components/premium/PremiumFeatureGate';
 import InlineQuotaIndicator from '../../components/premium/InlineQuotaIndicator';
 import NoteFlashcards from '../../components/notes/NoteFlashcards';
 import FlashcardGeneratorModal from '../../components/flashcards/FlashcardGeneratorModal';
+import ManualFlashcardModal from '../../components/flashcards/ManualFlashcardModal';
 import { CombinedNavigationProp, NoteDetailRouteProp } from '../../types/navigation';
 import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
 
@@ -35,6 +36,7 @@ export default function NoteDetailScreen() {
   const [deleting, setDeleting] = useState(false);
   const [isWebOnlyNote, setIsWebOnlyNote] = useState(false);
   const [showFlashcardGenerator, setShowFlashcardGenerator] = useState(false);
+  const [showManualFlashcardCreator, setShowManualFlashcardCreator] = useState(false);
 
   const { fetchNoteById, removeNote } = useNotes();
   const { categories } = useCategories();
@@ -121,6 +123,19 @@ export default function NoteDetailScreen() {
   };
 
   const handleFlashcardGenerationSuccess = () => {
+    // Reload the note to refresh the flashcards section
+    loadNote();
+  };
+
+  const handleManualFlashcardCreation = () => {
+    setShowManualFlashcardCreator(true);
+  };
+
+  const handleManualFlashcardCreatorClose = () => {
+    setShowManualFlashcardCreator(false);
+  };
+
+  const handleManualFlashcardSuccess = () => {
     // Reload the note to refresh the flashcards section
     loadNote();
   };
@@ -238,7 +253,14 @@ export default function NoteDetailScreen() {
               )}
             </View>
           </PremiumFeatureGate>
-          
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleManualFlashcardCreation}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#10b981" />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
             <Ionicons 
               name={isWebOnlyNote ? "globe-outline" : "create-outline"} 
@@ -329,6 +351,16 @@ export default function NoteDetailScreen() {
         noteTitle={note?.title || ''}
         onClose={handleFlashcardGeneratorClose}
         onSuccess={handleFlashcardGenerationSuccess}
+      />
+
+      {/* Manual Flashcard Creator Modal */}
+      <ManualFlashcardModal
+        visible={showManualFlashcardCreator}
+        noteId={noteId}
+        noteTitle={note?.title || ''}
+        noteTags={note?.tags || []}
+        onClose={handleManualFlashcardCreatorClose}
+        onSuccess={handleManualFlashcardSuccess}
       />
     </SafeAreaView>
   );

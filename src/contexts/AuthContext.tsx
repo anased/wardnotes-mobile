@@ -1,5 +1,6 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '../services/supabase/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
@@ -44,7 +45,48 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     // Check for existing session on app start
     initializeAuth();
+
+    // Listen for app state changes (background/foreground)
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription?.remove();
+    };
   }, []);
+
+  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    // When app comes to foreground, check and refresh session if needed
+    if (nextAppState === 'active') {
+      await checkAndRefreshSession();
+    }
+  };
+
+  const checkAndRefreshSession = async () => {
+    try {
+      const storedSession = await AsyncStorage.getItem('supabase.auth.token');
+
+      if (!storedSession) {
+        return;
+      }
+
+      const parsedSession = JSON.parse(storedSession);
+
+      // Check if session is expired or will expire soon (within 5 minutes)
+      const expiresAt = parsedSession.expires_at;
+      const now = Date.now() / 1000;
+      const fiveMinutes = 5 * 60;
+
+      if (!expiresAt || expiresAt - now < fiveMinutes) {
+        console.log('Session expired or expiring soon, refreshing...');
+        await refreshStoredSession(parsedSession);
+      } else {
+        // Session is still valid, just update headers to ensure they're set
+        updateSupabaseHeaders(parsedSession.access_token);
+      }
+    } catch (error) {
+      console.error('Error checking session on foreground:', error);
+    }
+  };
 
   const initializeAuth = async () => {
     try {
@@ -147,20 +189,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const updateSupabaseHeaders = (token: string | null) => {
-    if (token) {
-      // Update the headers in your custom supabase client
-      // This depends on your implementation in client.ts
-      (supabase as any).headers = {
-        ...(supabase as any).headers,
-        'Authorization': `Bearer ${token}`,
-      };
-    } else {
-      // Reset to anonymous key
-      (supabase as any).headers = {
-        ...(supabase as any).headers,
-        'Authorization': `Bearer ${(supabase as any).key}`,
-      };
-    }
+    // Use the updateHeaders method from SupabaseRestClient
+    supabase.updateHeaders(token);
   };
 
   const signIn = async (email: string, password: string) => {
@@ -265,7 +295,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       await supabase.auth.signOut();
 
       // Clear browser auth session (clears Google OAuth cookies)
-      await WebBrowser.maybeCompleteAuthSession();
+      WebBrowser.maybeCompleteAuthSession();
 
       // Clear local state
       await clearAuthState();

@@ -189,6 +189,20 @@ export default function NoteFlashcards({ noteId }: NoteFlashcardsProps) {
                   ? card.front_content
                   : card.cloze_content?.replace(/{{c\d+::/g, '[').replace(/}}/g, ']')}
               </Text>
+              {card.tags && card.tags.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.tagsRow}
+                  contentContainerStyle={styles.tagsContent}
+                >
+                  {card.tags.map((tag, tagIndex) => (
+                    <View key={tagIndex} style={styles.tagChip}>
+                      <Text style={styles.tagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
           </TouchableOpacity>
@@ -369,6 +383,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
     lineHeight: 20,
+  },
+  tagsRow: {
+    marginTop: 8,
+  },
+  tagsContent: {
+    gap: 6,
+  },
+  tagChip: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  tagText: {
+    fontSize: 11,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   moreIndicator: {
     alignItems: 'center',

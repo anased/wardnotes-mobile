@@ -284,8 +284,12 @@ class SupabaseTable {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
+        // Check for JWT expired error
+        if (response.status === 401 && data.message?.includes('JWT')) {
+          console.warn('JWT expired during query execution. Please refresh the app.');
+        }
         return { data: null, error: data };
       }
 

@@ -13,11 +13,13 @@ import {
   SafeAreaView,
   StatusBar
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useDecksWithStats } from '../../hooks/useDecks';
 import { FlashcardService } from '../../services/flashcardService';
+import CustomStudyModal from '../../components/flashcards/CustomStudyModal';
 import type { MainTabNavigationProp } from '../../types/navigation';
-import type { FlashcardDeck, DeckWithStats } from '../../types/flashcard';
+import type { FlashcardDeck, DeckWithStats, Flashcard } from '../../types/flashcard';
 
 export default function FlashcardDashboard() {
   const navigation = useNavigation<MainTabNavigationProp>();
@@ -27,6 +29,7 @@ export default function FlashcardDashboard() {
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckDescription, setNewDeckDescription] = useState('');
   const [creating, setCreating] = useState(false);
+  const [showCustomStudyModal, setShowCustomStudyModal] = useState(false);
 
   const filteredDecks = decksWithStats.filter(deck =>
     deck.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -68,6 +71,14 @@ export default function FlashcardDashboard() {
 
   const handleStudyPress = useCallback((deck: FlashcardDeck) => {
     navigation.navigate('StudyScreen', { deckId: deck.id, mode: 'mixed' });
+  }, [navigation]);
+
+  const handleCustomStudyStart = useCallback((cards: Flashcard[], deckId: string) => {
+    navigation.navigate('StudyScreen', {
+      deckId,
+      mode: 'mixed',
+      cards,  // Pass pre-fetched cards
+    });
   }, [navigation]);
 
   const renderDeckCard = (deck: DeckWithStats) => (
@@ -166,6 +177,15 @@ export default function FlashcardDashboard() {
           </View>
         </View>
 
+        {/* Custom Study Button */}
+        <TouchableOpacity
+          style={styles.customStudyButton}
+          onPress={() => setShowCustomStudyModal(true)}
+        >
+          <Ionicons name="funnel-outline" size={20} color="#0ea5e9" />
+          <Text style={styles.customStudyButtonText}>Custom Study Session</Text>
+        </TouchableOpacity>
+
         {/* Search */}
         <View style={styles.searchContainer}>
           <TextInput
@@ -255,6 +275,13 @@ export default function FlashcardDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Study Modal */}
+      <CustomStudyModal
+        visible={showCustomStudyModal}
+        onClose={() => setShowCustomStudyModal(false)}
+        onStartSession={handleCustomStudyStart}
+      />
     </SafeAreaView>
   );
 }
@@ -284,7 +311,31 @@ const styles = StyleSheet.create({
   statsOverview: {
     flexDirection: 'row',
     paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  customStudyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
     marginBottom: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0ea5e9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    gap: 8,
+  },
+  customStudyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0ea5e9',
   },
   statCard: {
     flex: 1,

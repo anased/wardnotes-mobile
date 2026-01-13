@@ -99,7 +99,8 @@ export const useMobileStudySession = () => {
   const startMobileSession = useCallback(async (
     deckIdOrNoteId: string,
     mode: MobileStudyMode,
-    isNoteSession: boolean = false
+    isNoteSession: boolean = false,
+    preFetchedCards?: Flashcard[]  // NEW: Support for pre-fetched cards (custom study)
   ) => {
     try {
       setLoading(true);
@@ -108,7 +109,10 @@ export const useMobileStudySession = () => {
       // Get study cards based on mode and session type
       let cards: Flashcard[] = [];
 
-      if (isNoteSession) {
+      // If pre-fetched cards are provided, use them (custom study session)
+      if (preFetchedCards && preFetchedCards.length > 0) {
+        cards = preFetchedCards;
+      } else if (isNoteSession) {
         // For note-based sessions, always use mixed mode
         cards = await FlashcardService.getStudyCardsForNote(deckIdOrNoteId, 30, 10);
       } else {

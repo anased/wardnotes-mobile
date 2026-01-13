@@ -386,6 +386,22 @@ export default function FlashcardListModal({
                       </View>
                     )}
 
+                    {/* Tags */}
+                    {flashcard.tags && flashcard.tags.length > 0 && (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.tagsRow}
+                        contentContainerStyle={styles.tagsContent}
+                      >
+                        {flashcard.tags.map((tag, index) => (
+                          <View key={index} style={styles.tagChip}>
+                            <Text style={styles.tagText}>{tag}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    )}
+
                     {/* Card Stats */}
                     <View style={styles.cardStats}>
                       <Text style={styles.statText}>Reviews: {flashcard.total_reviews}</Text>
@@ -577,6 +593,23 @@ const styles = StyleSheet.create({
   },
   clozeContent: {
     marginBottom: 12,
+  },
+  tagsRow: {
+    marginVertical: 8,
+  },
+  tagsContent: {
+    gap: 6,
+  },
+  tagChip: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  tagText: {
+    fontSize: 11,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   cardStats: {
     flexDirection: 'row',

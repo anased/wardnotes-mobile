@@ -41,88 +41,88 @@ export const MOBILE_TYPOGRAPHY_CSS = `
     color: #1f2937 !important;
   }
 
-  /* Mobile-optimized heading sizes - match native exactly */
+  /* Mobile-optimized heading sizes - follows iOS HIG typography scale */
   h1, h1 * {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 24px !important;
+    font-size: 18px !important;
     font-weight: 700 !important;
-    line-height: 1.4 !important;
-    margin-top: 16px !important;
-    margin-bottom: 12px !important;
+    line-height: 1.3 !important;
+    margin-top: 12px !important;
+    margin-bottom: 6px !important;
     color: #1f2937 !important;
   }
 
   h2, h2 * {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 20px !important;
+    font-size: 16px !important;
     font-weight: 700 !important;
-    line-height: 1.4 !important;
-    margin-top: 14px !important;
-    margin-bottom: 10px !important;
+    line-height: 1.3 !important;
+    margin-top: 10px !important;
+    margin-bottom: 4px !important;
     color: #1f2937 !important;
   }
 
   h3, h3 * {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 18px !important;
-    font-weight: 700 !important;
-    line-height: 1.4 !important;
-    margin-top: 12px !important;
-    margin-bottom: 8px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+    margin-top: 8px !important;
+    margin-bottom: 4px !important;
     color: #1f2937 !important;
   }
 
   h4 {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 17px !important;
+    font-size: 15px !important;
     font-weight: 600 !important;
-    line-height: 1.4 !important;
-    margin-top: 10px !important;
-    margin-bottom: 6px !important;
+    line-height: 1.3 !important;
+    margin-top: 6px !important;
+    margin-bottom: 4px !important;
     color: #1f2937 !important;
   }
 
   h5, h6 {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 16px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
-    line-height: 1.4 !important;
-    margin-top: 8px !important;
-    margin-bottom: 6px !important;
+    line-height: 1.3 !important;
+    margin-top: 4px !important;
+    margin-bottom: 2px !important;
     color: #1f2937 !important;
   }
 
   /* Body text - optimal for mobile reading */
   p {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 16px !important;
+    font-size: 15px !important;
     line-height: 1.5 !important;
-    margin-bottom: 12px !important;
+    margin-bottom: 8px !important;
     color: #1f2937 !important;
   }
 
   /* Lists - tighter spacing for mobile */
   ul, ol {
-    margin-top: 8px !important;
-    margin-bottom: 12px !important;
-    padding-left: 24px !important;
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+    padding-left: 20px !important;
   }
 
   li {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 16px !important;
+    font-size: 15px !important;
     line-height: 1.5 !important;
-    margin-bottom: 4px !important;
+    margin-bottom: 2px !important;
     color: #1f2937 !important;
   }
 
   /* Blockquotes */
   blockquote {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    font-size: 16px !important;
+    font-size: 15px !important;
     line-height: 1.5 !important;
-    margin: 12px 0 !important;
-    padding-left: 12px !important;
+    margin: 8px 0 !important;
+    padding-left: 10px !important;
     color: #6b7280 !important;
     font-style: italic !important;
     border-left: 3px solid #d1d5db !important;

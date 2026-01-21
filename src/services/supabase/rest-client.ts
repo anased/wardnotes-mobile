@@ -121,6 +121,8 @@ class SupabaseTable {
   private operation: string;
   private insertData: any;
   private updateData: any;
+  private countMode: boolean;
+  private headMode: boolean;
 
   constructor(url: string, key: string, table: string) {
     this.url = url;
@@ -130,10 +132,15 @@ class SupabaseTable {
     this.operation = 'select';
     this.insertData = null;
     this.updateData = null;
+    this.countMode = false;
+    this.headMode = false;
   }
 
-  // Make the class itself awaitable
-  then(resolve: Function, reject?: Function) {
+  // Make the class itself awaitable (thenable pattern)
+  then<TResult1 = any, TResult2 = never>(
+    resolve?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null,
+    reject?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2> {
     return this.execute().then(resolve, reject);
   }
 
@@ -141,12 +148,18 @@ class SupabaseTable {
     try {
       const session = await AsyncStorage.getItem('supabase.auth.token');
       const token = session ? JSON.parse(session).access_token : this.key;
-      
+
+      // Build Prefer header based on options
+      let prefer = 'return=representation';
+      if (this.countMode) {
+        prefer = 'count=exact';
+      }
+
       return {
         'apikey': this.key,
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
+        'Prefer': prefer
       };
     } catch (error) {
       console.error('Error getting auth headers:', error);
@@ -159,8 +172,16 @@ class SupabaseTable {
     }
   }
 
-  select(columns = '*') {
+  // Select with optional count mode support
+  // Usage: .select('*', { count: 'exact', head: true }) for count-only queries
+  select(columns: string = '*', options?: { count?: 'exact'; head?: boolean }) {
     this.query = `select=${columns}`;
+    if (options?.count === 'exact') {
+      this.countMode = true;
+    }
+    if (options?.head) {
+      this.headMode = true;
+    }
     return this;
   }
 
@@ -211,6 +232,15 @@ class SupabaseTable {
   or(conditions: string) {
     const separator = this.query ? '&' : '';
     this.query += `${separator}or=(${conditions})`;
+    return this;
+  }
+
+  // Array overlaps operator - returns true if arrays share any elements (OR logic)
+  overlaps(column: string, values: any[]) {
+    const separator = this.query ? '&' : '';
+    // PostgREST array overlap operator: column=ov.{value1,value2}
+    const valueList = values.map(v => `"${v}"`).join(',');
+    this.query += `${separator}${column}=ov.{${valueList}}`;
     return this;
   }
 
@@ -275,26 +305,49 @@ class SupabaseTable {
         default: // select
           const selectQuery = this.query ? `?${this.query}` : '';
           url = `${this.url}/rest/v1/${this.table}${selectQuery}`;
-          method = 'GET';
+          // Use HEAD method for count-only queries (when head: true)
+          method = this.headMode ? 'HEAD' : 'GET';
           break;
       }
-      
-      console.log('REST Client - Executing:', { operation: this.operation, method, url });
+
+      console.log('REST Client - Executing:', { operation: this.operation, method, url, countMode: this.countMode, headMode: this.headMode });
       console.log('REST Client - Headers:', headers);
       if (body) console.log('REST Client - Body:', body);
-      
+
       const response = await fetch(url, {
         method,
         headers,
         body,
       });
 
+      // For count-only queries (HEAD request), extract count from Content-Range header
+      if (this.countMode && this.headMode) {
+        const contentRange = response.headers.get('Content-Range');
+        console.log('REST Client - Content-Range header:', contentRange);
+
+        if (!response.ok) {
+          return { data: null, count: null, error: { message: 'Request failed', status: response.status } };
+        }
+
+        // Content-Range format: "0-9/100" or "*/100" where 100 is total count
+        let count = 0;
+        if (contentRange) {
+          const match = contentRange.match(/\/(\d+)/);
+          if (match) {
+            count = parseInt(match[1], 10);
+          }
+        }
+
+        console.log('REST Client - Extracted count:', count);
+        return { data: null, count, error: null };
+      }
+
       const data = await response.json();
       console.log('REST Client - Response status:', response.status);
       console.log('REST Client - Response data type:', typeof data);
       console.log('REST Client - Response data length:', Array.isArray(data) ? data.length : 'not array');
       console.log('REST Client - Response data:', JSON.stringify(data, null, 2));
-      
+
       if (!response.ok) {
         console.error('REST Client - Error response:', data);
         return { data: null, error: data };

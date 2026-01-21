@@ -310,7 +310,6 @@ export default function NoteDetailScreen() {
 
         {note.tags && note.tags.length > 0 && (
           <View style={styles.tagsContainer}>
-            <Text style={styles.tagsLabel}>Tags:</Text>
             <View style={styles.tags}>
               {note.tags.map((tag: string, index: number) => (
                 <Text key={index} style={styles.tag}>
@@ -399,14 +398,14 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   noteHeader: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
-    marginBottom: 12,
-    lineHeight: 32,
+    marginBottom: 8,
+    lineHeight: 26,
   },
   metadata: {
     flexDirection: 'row',
@@ -417,7 +416,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
   },
   date: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
   },
   badgeContainer: {
@@ -450,13 +449,7 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   tagsContainer: {
-    marginBottom: 20,
-  },
-  tagsLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   tags: {
     flexDirection: 'row',

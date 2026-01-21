@@ -237,6 +237,12 @@ class SupabaseTable {
     return this;
   }
 
+  neq(column: string, value: any): SupabaseTable {
+    const separator = this.query ? '&' : '';
+    this.query += `${separator}${column}=neq.${encodeURIComponent(value)}`;
+    return this;
+  }
+
   or(conditions: string): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}or=(${conditions})`;
@@ -246,6 +252,13 @@ class SupabaseTable {
   contains(column: string, value: any[]): SupabaseTable {
     const separator = this.query ? '&' : '';
     this.query += `${separator}${column}=cs.{${value.map(v => `"${v}"`).join(',')}}`;
+    return this;
+  }
+
+  // Array overlaps operator - returns true if arrays share any elements (OR logic)
+  overlaps(column: string, value: any[]): SupabaseTable {
+    const separator = this.query ? '&' : '';
+    this.query += `${separator}${column}=ov.{${value.map(v => `"${v}"`).join(',')}}`;
     return this;
   }
 

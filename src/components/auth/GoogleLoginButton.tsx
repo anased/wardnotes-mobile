@@ -7,9 +7,11 @@ import {
   ActivityIndicator,
   Alert,
   View,
+  Platform,
 } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 import { supabase } from '../../services/supabase/client';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -25,22 +27,44 @@ export default function GoogleLoginButton() {
       setIsLoading(true);
 
       // Create redirect URI for Expo
+      // In Expo Go, this uses the exp:// scheme
+      // In standalone builds, this uses the custom scheme (wardnotes://)
       const redirectUri = AuthSession.makeRedirectUri({
+        // For standalone builds, use the custom scheme
         scheme: 'wardnotes',
+        // For Expo Go, don't specify scheme - it will use exp:// automatically
+        // The path should be simple to avoid issues
         path: 'auth/callback',
+        // Prefer localhost for web
+        preferLocalhost: Platform.OS === 'web',
       });
 
       console.log('OAuth Redirect URI:', redirectUri);
+      console.log('Expo app ownership:', Constants.appOwnership);
+      console.log('Platform:', Platform.OS);
 
       // Get OAuth URL from Supabase
       const { url } = supabase.auth.signInWithOAuth('google', redirectUri);
 
       console.log('Opening OAuth URL:', url);
 
-      // Open OAuth flow in browser using WebBrowser (modern approach)
-      const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
+      // Open OAuth flow in browser
+      // The redirectUri tells WebBrowser when to close and return to the app
+      const result = await WebBrowser.openAuthSessionAsync(
+        url,
+        redirectUri,
+        {
+          // Show the share button on iOS for better UX
+          showInRecents: true,
+          // Use ephemeral session on iOS 13+ (no cookies shared)
+          preferEphemeralSession: false,
+        }
+      );
 
-      console.log('OAuth result:', result);
+      console.log('OAuth result type:', result.type);
+      if (result.type === 'success') {
+        console.log('OAuth result URL:', result.url);
+      }
 
       if (result.type === 'success') {
         // Extract tokens from URL fragment (implicit flow)
@@ -85,6 +109,8 @@ export default function GoogleLoginButton() {
         console.log('Google sign-in successful');
       } else if (result.type === 'cancel') {
         console.log('User cancelled OAuth flow');
+      } else if (result.type === 'dismiss') {
+        console.log('OAuth browser was dismissed');
       } else {
         throw new Error('OAuth flow failed');
       }

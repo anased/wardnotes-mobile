@@ -161,4 +161,21 @@ export const MOBILE_TYPOGRAPHY_CSS = `
   em, i {
     font-style: italic !important;
   }
+
+  /* Responsive images - auto-fit to screen width */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 12px 0 !important;
+    border-radius: 8px !important;
+  }
+
+  /* TipTap image node wrapper */
+  .ProseMirror img,
+  [data-type="image"] img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+  }
 `;

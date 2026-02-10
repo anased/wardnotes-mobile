@@ -287,11 +287,28 @@ export interface TipTapNode {
             }]
           };
   
-        case 'br':
+        case 'img':
+          // Handle image elements
+          const imgSrc = element.attributes?.src;
+          const imgAlt = element.attributes?.alt;
+          const imgTitle = element.attributes?.title;
+          if (imgSrc) {
+            return {
+              type: 'image',
+              attrs: {
+                src: imgSrc,
+                alt: imgAlt || null,
+                title: imgTitle || null,
+              }
+            };
+          }
+          return null;
+
+      case 'br':
           return {
             type: 'hardBreak'
           };
-  
+
         case 'hr':
           return {
             type: 'horizontalRule'
@@ -785,9 +802,19 @@ export interface TipTapNode {
   
       case 'hardBreak':
         return '<br>';
-  
+
       case 'horizontalRule':
         return '<hr>';
+
+      case 'image':
+        // Convert TipTap image node to HTML img tag
+        const imgSrc = node.attrs?.src || '';
+        const imgAlt = node.attrs?.alt || '';
+        const imgTitle = node.attrs?.title || '';
+        if (imgSrc) {
+          return `<img src="${imgSrc}" alt="${escapeHtml(imgAlt)}" title="${escapeHtml(imgTitle)}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" />`;
+        }
+        return '';
   
       case 'text':
         let text = node.text || '';

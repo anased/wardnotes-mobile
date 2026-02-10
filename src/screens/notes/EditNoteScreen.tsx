@@ -17,11 +17,16 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { Toolbar } from '@10play/tentap-editor';
+import { Toolbar, DEFAULT_TOOLBAR_ITEMS } from '@10play/tentap-editor';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
 import TipTapEditor, { TipTapEditorRef } from '../../components/notes/TipTapEditor';
+import TagChipInput from '../../components/ui/TagChipInput';
+import { createImageToolbarItem } from '../../utils/toolbarItems';
+
+// Custom toolbar items with image support
+const CUSTOM_TOOLBAR_ITEMS = [...DEFAULT_TOOLBAR_ITEMS, createImageToolbarItem()];
 import { CombinedNavigationProp, EditNoteRouteProp } from '../../types/navigation';
 import { hasTablesInContent, getWebOnlyReason } from '../../utils/tableDetection';
 
@@ -171,7 +176,7 @@ export default function EditNoteScreen() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState<any>(null);
   const [category, setCategory] = useState('');
-  const [tags, setTags] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -235,7 +240,7 @@ export default function EditNoteScreen() {
       setContent(noteData.content);
       
       setCategory(noteData.category);
-      setTags(noteData.tags ? noteData.tags.join(', ') : '');
+      setSelectedTags(noteData.tags || []);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load note');
@@ -310,13 +315,9 @@ export default function EditNoteScreen() {
 
       console.log('Validation passed, starting save process...');
       setSaving(true);
-      const tagArray = tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
 
       // Ensure tags exist in database before saving note
-      await ensureTagsExist(tagArray);
+      await ensureTagsExist(selectedTags);
 
       // Use the final content from editor
       const contentToSave = finalContent || {
@@ -332,14 +333,14 @@ export default function EditNoteScreen() {
       console.log('🔵 Content to save type:', typeof contentToSave);
       console.log('🔵 Content to save JSON:', JSON.stringify(contentToSave, null, 2));
       console.log('🔵 Category:', category);
-      console.log('🔵 Tags:', tagArray);
+      console.log('🔵 Tags:', selectedTags);
       console.log('🔵 About to call editNote...');
 
       const saveResult = await editNote(noteId, {
         title: title.trim(),
         content: contentToSave,
         category,
-        tags: tagArray,
+        tags: selectedTags,
       });
 
       console.log('🟡 === SAVE COMPLETED ===');
@@ -383,21 +384,6 @@ export default function EditNoteScreen() {
     } catch (error: any) {
       console.error('Error creating category:', error);
       Alert.alert('Error', 'Failed to create category');
-    }
-  };
-
-  const getTagSuggestions = () => {
-    const currentTags = tags.split(',').map(t => t.trim()).filter(Boolean);
-    return availableTags
-      .filter(tag => !currentTags.includes(tag.name))
-      .slice(0, 5);
-  };
-
-  const addSuggestedTag = (tagName: string) => {
-    const currentTags = tags.split(',').map(t => t.trim()).filter(Boolean);
-    if (!currentTags.includes(tagName)) {
-      const newTags = [...currentTags, tagName].join(', ');
-      setTags(newTags);
     }
   };
 
@@ -493,32 +479,13 @@ export default function EditNoteScreen() {
           </View>
 
           <View style={styles.tagsContainer}>
-            <Text style={styles.label}>Tags (comma separated)</Text>
-            <TextInput
-              style={styles.tagsInput}
-              placeholder="Enter tags..."
-              value={tags}
-              onChangeText={setTags}
-              multiline
+            <Text style={styles.label}>Tags</Text>
+            <TagChipInput
+              selectedTags={selectedTags}
+              availableTags={availableTags.map(tag => tag.name)}
+              onTagsChange={setSelectedTags}
+              placeholder="Add tag..."
             />
-            
-            {/* Tag suggestions */}
-            {getTagSuggestions().length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                <Text style={styles.suggestionsLabel}>Suggestions:</Text>
-                <View style={styles.suggestionsRow}>
-                  {getTagSuggestions().map((tag) => (
-                    <TouchableOpacity
-                      key={tag.id}
-                      style={styles.suggestionTag}
-                      onPress={() => addSuggestedTag(tag.name)}
-                    >
-                      <Text style={styles.suggestionText}>{tag.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
           </View>
 
           <View style={styles.editorContainer}>
@@ -536,14 +503,17 @@ export default function EditNoteScreen() {
           </View>
         </ScrollView>
 
-        {/* Toolbar positioned outside ScrollView following official 10tap-editor pattern */}
+        {/* Toolbar with image support - uses built-in 10tap Toolbar with custom items */}
         {editorRef.current && content && (
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={keyboardVerticalOffset}
             style={styles.toolbarKeyboardAvoidingView}
           >
-            <Toolbar editor={editorRef.current.getEditorBridge()} />
+            <Toolbar
+              editor={editorRef.current.getEditorBridge()}
+              items={CUSTOM_TOOLBAR_ITEMS}
+            />
           </KeyboardAvoidingView>
         )}
 
@@ -788,40 +758,6 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     marginBottom: 15,
-  },
-  tagsInput: {
-    padding: 15,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    minHeight: 50,
-    textAlignVertical: 'top',
-  },
-  suggestionsContainer: {
-    marginTop: 8,
-  },
-  suggestionsLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  suggestionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  suggestionTag: {
-    backgroundColor: '#e0f2fe',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  suggestionText: {
-    fontSize: 12,
-    color: '#0ea5e9',
   },
   editorContainer: {
     flex: 1,

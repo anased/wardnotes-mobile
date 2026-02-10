@@ -29,7 +29,7 @@ export default function NoteDetailScreen() {
   const navigation = useNavigation<CombinedNavigationProp>();
   const route = useRoute<NoteDetailRouteProp>();
   const { noteId } = route.params;
-  
+
   const [note, setNote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,12 +59,12 @@ export default function NoteDetailScreen() {
       console.log('👁️ Note content field:', noteData.content);
       console.log('👁️ Content type:', typeof noteData.content);
       console.log('👁️ Content is truthy?', !!noteData.content);
-      
+
       // Check if this note contains tables
       const containsTables = hasTablesInContent(noteData.content);
       console.log('👁️ Note contains tables:', containsTables);
       setIsWebOnlyNote(containsTables);
-      
+
       setNote(noteData);
       setError(null);
     } catch (err: any) {
@@ -142,11 +142,9 @@ export default function NoteDetailScreen() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
+      month: 'short',
       day: 'numeric',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   };
 
@@ -228,11 +226,15 @@ export default function NoteDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Slim Header Bar */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#374151" />
-        </TouchableOpacity>
-        
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color="#374151" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>{note.title}</Text>
+        </View>
+
         <View style={styles.headerActions}>
           <PremiumFeatureGate
             featureType="flashcard_generation"
@@ -258,73 +260,75 @@ export default function NoteDetailScreen() {
             style={styles.actionButton}
             onPress={handleManualFlashcardCreation}
           >
-            <Ionicons name="add-circle-outline" size={20} color="#10b981" />
+            <Ionicons name="add-circle-outline" size={20} color="#0ea5e9" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
-            <Ionicons 
-              name={isWebOnlyNote ? "globe-outline" : "create-outline"} 
-              size={20} 
-              color={isWebOnlyNote ? "#f59e0b" : "#0ea5e9"} 
+            <Ionicons
+              name={isWebOnlyNote ? "globe-outline" : "create-outline"}
+              size={20}
+              color={isWebOnlyNote ? "#f59e0b" : "#0ea5e9"}
             />
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton} 
+
+          <TouchableOpacity
+            style={styles.actionButton}
             onPress={handleDelete}
             disabled={deleting}
           >
-            <Ionicons 
-              name="trash-outline" 
-              size={20} 
-              color={deleting ? "#9ca3af" : "#ef4444"} 
+            <Ionicons
+              name="trash-outline"
+              size={20}
+              color={deleting ? "#9ca3af" : "#ef4444"}
             />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.noteHeader}>
-          <Text style={styles.title}>{note.title}</Text>
-          
-          <View style={styles.metadata}>
-            <Text style={styles.date}>
-              {formatDate(note.created_at)}
-            </Text>
-            <View style={styles.badgeContainer}>
-              {isWebOnlyNote && (
-                <View style={styles.webOnlyBadge}>
-                  <Ionicons name="globe-outline" size={12} color="#f59e0b" />
-                  <Text style={styles.webOnlyText}>Web Only</Text>
-                </View>
-              )}
-              <View style={[
-                styles.categoryBadge, 
-                { backgroundColor: getCategoryBadgeColor(note.category) }
-              ]}>
-                <Text style={styles.categoryText}>{note.category}</Text>
-              </View>
-            </View>
+      {/* Unified Metadata Line */}
+      <View style={styles.metadataBar}>
+        <View style={[
+          styles.categoryBadge,
+          { backgroundColor: getCategoryBadgeColor(note.category) }
+        ]}>
+          <Text style={styles.categoryText}>{note.category?.toUpperCase()}</Text>
+        </View>
+
+        {isWebOnlyNote && (
+          <View style={styles.webOnlyBadge}>
+            <Ionicons name="globe-outline" size={12} color="#f59e0b" />
+            <Text style={styles.webOnlyText}>Web Only</Text>
           </View>
+        )}
+
+        <View style={styles.dateContainer}>
+          <Ionicons name="calendar-outline" size={14} color="#6b7280" />
+          <Text style={styles.dateText}>{formatDate(note.created_at)}</Text>
         </View>
 
         {note.tags && note.tags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            <View style={styles.tags}>
-              {note.tags.map((tag: string, index: number) => (
-                <Text key={index} style={styles.tag}>
-                  {tag}
-                </Text>
-              ))}
-            </View>
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tagsScrollView}
+            contentContainerStyle={styles.tagsRow}
+          >
+            {note.tags.map((tag: string, index: number) => (
+              <View key={index} style={styles.tagPill}>
+                <Text style={styles.tagText}>#{tag}</Text>
+              </View>
+            ))}
+          </ScrollView>
         )}
+      </View>
+
+      <ScrollView style={styles.content}>
 
         <View style={styles.contentContainer}>
           {note.content ? (
             <TipTapEditor
               initialContent={note.content}
-              onContentChange={() => {}} // No-op for read-only
+              onContentChange={() => { }} // No-op for read-only
               editable={false}
               showToolbar={false}
             />
@@ -368,102 +372,112 @@ export default function NoteDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
   },
+  // Slim Header Bar
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#f3f4f6',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: '#1f2937',
+    marginLeft: 4,
+    flex: 1,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   actionButton: {
-    marginLeft: 15,
     padding: 8,
-    borderRadius: 6,
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  noteHeader: {
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 8,
-    lineHeight: 26,
-  },
-  metadata: {
+  // Unified Metadata Bar
+  metadataBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  date: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderBottomColor: '#f3f4f6',
+    flexWrap: 'wrap',
     gap: 8,
+  },
+  categoryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  categoryText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1e40af',
+    letterSpacing: 0.5,
   },
   webOnlyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 4,
     backgroundColor: '#fef3c7',
     gap: 4,
   },
   webOnlyText: {
     fontSize: 10,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#d97706',
   },
-  categoryBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  tagsContainer: {
-    marginBottom: 12,
-  },
-  tags: {
+  dateContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
   },
-  tag: {
+  dateText: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  tagsScrollView: {
+    flexShrink: 1,
+    maxWidth: '50%',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tagPill: {
     backgroundColor: '#f3f4f6',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 4,
+  },
+  tagText: {
     fontSize: 12,
     color: '#6b7280',
-    marginRight: 8,
-    marginBottom: 5,
+    fontWeight: '500',
+  },
+  // Content Area
+  content: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#ffffff',
   },
   contentContainer: {
     marginBottom: 24,
@@ -474,8 +488,8 @@ const styles = StyleSheet.create({
     marginVertical: 24,
   },
   noContentContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     minHeight: 300,
@@ -496,6 +510,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  // Loading/Error States
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -518,10 +533,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#0ea5e9',
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   retryButtonText: {
     color: 'white',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });

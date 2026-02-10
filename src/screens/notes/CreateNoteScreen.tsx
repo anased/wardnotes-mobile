@@ -1,5 +1,5 @@
 // src/screens/notes/CreateNoteScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,12 +14,17 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { Toolbar } from '@10play/tentap-editor';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Toolbar, DEFAULT_TOOLBAR_ITEMS } from '@10play/tentap-editor';
 import useNotes from '../../hooks/useNotes';
 import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
 import TipTapEditor, { TipTapEditorRef } from '../../components/notes/TipTapEditor';
+import TagChipInput from '../../components/ui/TagChipInput';
+import { createImageToolbarItem } from '../../utils/toolbarItems';
+
+// Custom toolbar items with image support
+const CUSTOM_TOOLBAR_ITEMS = [...DEFAULT_TOOLBAR_ITEMS, createImageToolbarItem()];
 
 // Custom Category Picker Component
 interface CategoryPickerProps {
@@ -163,7 +168,7 @@ export default function CreateNoteScreen() {
   const [content, setContent] = useState<any>(null);
   const editorRef = useRef<TipTapEditorRef>(null);
   const [category, setCategory] = useState('');
-  const [tags, setTags] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -222,6 +227,27 @@ export default function CreateNoteScreen() {
     }
   }, [categories, category]);
 
+  // Reset form when screen gains focus (fixes stale data when creating new note)
+  useFocusEffect(
+    useCallback(() => {
+      // Reset all form fields to initial state
+      setTitle('');
+      setContent(null);
+      setSelectedTags([]);
+      // Reset category to first available or empty
+      if (categories.length > 0) {
+        setCategory(categories[0].name);
+      } else {
+        setCategory('');
+      }
+      // Clear the editor content
+      if (editorRef.current) {
+        editorRef.current.clearContent();
+      }
+      console.log('📝 CreateNoteScreen focused - form reset');
+    }, [categories])
+  );
+
   // Ensure tags exist in database (create if needed)
   const ensureTagsExist = async (tagArray: string[]) => {
     try {
@@ -261,13 +287,8 @@ export default function CreateNoteScreen() {
 
     setLoading(true);
     try {
-      const tagArray = tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
-
       // Ensure tags exist in database before saving note
-      await ensureTagsExist(tagArray);
+      await ensureTagsExist(selectedTags);
 
       // Force content synchronization from editor before saving (similar to EditNoteScreen)
       let finalContent = content;
@@ -295,13 +316,13 @@ export default function CreateNoteScreen() {
       console.log('📝 Content to save:', contentToSave);
       console.log('📝 Content to save JSON:', JSON.stringify(contentToSave, null, 2));
       console.log('📝 Category:', category);
-      console.log('📝 Tags:', tagArray);
+      console.log('📝 Tags:', selectedTags);
 
       await addNote({
         title: title.trim(),
         content: contentToSave,
         category,
-        tags: tagArray,
+        tags: selectedTags,
       });
 
       Alert.alert('Success', 'Note created successfully', [
@@ -335,21 +356,6 @@ export default function CreateNoteScreen() {
     }
   };
 
-
-  const getTagSuggestions = () => {
-    const currentTags = tags.split(',').map(t => t.trim()).filter(Boolean);
-    return availableTags
-      .filter(tag => !currentTags.includes(tag.name))
-      .slice(0, 5);
-  };
-
-  const addSuggestedTag = (tagName: string) => {
-    const currentTags = tags.split(',').map(t => t.trim()).filter(Boolean);
-    if (!currentTags.includes(tagName)) {
-      const newTags = [...currentTags, tagName].join(', ');
-      setTags(newTags);
-    }
-  };
 
   console.log('Current state:', {
     categoriesLoading,
@@ -412,32 +418,13 @@ export default function CreateNoteScreen() {
           </View>
 
           <View style={styles.tagsContainer}>
-            <Text style={styles.label}>Tags (comma separated)</Text>
-            <TextInput
-              style={styles.tagsInput}
-              placeholder="Enter tags..."
-              value={tags}
-              onChangeText={setTags}
-              multiline
+            <Text style={styles.label}>Tags</Text>
+            <TagChipInput
+              selectedTags={selectedTags}
+              availableTags={availableTags.map(tag => tag.name)}
+              onTagsChange={setSelectedTags}
+              placeholder="Add tag..."
             />
-            
-            {/* Tag suggestions */}
-            {getTagSuggestions().length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                <Text style={styles.suggestionsLabel}>Suggestions:</Text>
-                <View style={styles.suggestionsRow}>
-                  {getTagSuggestions().map((tag) => (
-                    <TouchableOpacity
-                      key={tag.id}
-                      style={styles.suggestionTag}
-                      onPress={() => addSuggestedTag(tag.name)}
-                    >
-                      <Text style={styles.suggestionText}>{tag.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
           </View>
 
           <View style={styles.editorContainer}>
@@ -457,14 +444,17 @@ export default function CreateNoteScreen() {
           </View>
         </ScrollView>
 
-        {/* Toolbar positioned outside ScrollView following official 10tap-editor pattern */}
+        {/* Toolbar with image support - uses built-in 10tap Toolbar with custom items */}
         {editorRef.current && (
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={keyboardVerticalOffset}
             style={styles.toolbarKeyboardAvoidingView}
           >
-            <Toolbar editor={editorRef.current.getEditorBridge()} />
+            <Toolbar
+              editor={editorRef.current.getEditorBridge()}
+              items={CUSTOM_TOOLBAR_ITEMS}
+            />
           </KeyboardAvoidingView>
         )}
 
@@ -718,40 +708,6 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     marginBottom: 15,
-  },
-  tagsInput: {
-    padding: 15,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    minHeight: 50,
-    textAlignVertical: 'top',
-  },
-  suggestionsContainer: {
-    marginTop: 8,
-  },
-  suggestionsLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  suggestionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  suggestionTag: {
-    backgroundColor: '#e0f2fe',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  suggestionText: {
-    fontSize: 12,
-    color: '#0ea5e9',
   },
   editorContainer: {
     flex: 1,

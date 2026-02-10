@@ -127,12 +127,14 @@ class SupabaseRestClient {
     // OAuth method for Google Sign-In
     signInWithOAuth: (provider: string, redirectTo: string) => {
       // Return OAuth URL - the actual OAuth flow will be handled by expo-auth-session
-      // Query parameters to pass to Google OAuth:
-      // - prompt=select_account: Forces account picker to show every time
-      // - access_type=offline: Request a refresh token
+      // Using implicit flow (response_type=token) to get tokens directly in URL fragment
+      // This avoids needing a server-side callback to exchange authorization codes
       const queryParams = new URLSearchParams({
         provider: provider,
         redirect_to: redirectTo,
+        // CRITICAL: Use implicit flow to return tokens directly in the URL fragment
+        // Without this, Supabase uses code flow which redirects to the web callback
+        response_type: 'token',
         // These get passed to the OAuth provider (Google)
         prompt: 'select_account',
         access_type: 'offline',

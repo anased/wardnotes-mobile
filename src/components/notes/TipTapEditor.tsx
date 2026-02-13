@@ -20,6 +20,7 @@ export interface TipTapEditorRef {
   getCurrentContent: () => Promise<any>;
   getEditorBridge: () => any; // Expose editor bridge for external toolbar
   clearContent: () => Promise<void>; // Clear editor content for form reset
+  appendContent: (newNodes: any[]) => Promise<void>; // Append content nodes to end of document
 }
 
 // Skeleton component for loading state
@@ -266,7 +267,66 @@ const TipTapEditor = React.forwardRef<TipTapEditorRef, TipTapEditorProps>(({
         }
       }
     },
-  }), [editor, forceContentUpdate]);
+    appendContent: async (newNodes: any[]) => {
+      if (editor && newNodes && newNodes.length > 0) {
+        try {
+          console.log('📝 Appending content to editor...');
+          console.log('📝 New nodes count:', newNodes.length);
+
+          // Get current content from editor (cast to proper type)
+          const currentContent = await editor.getJSON() as { type?: string; content?: any[] } | null;
+          console.log('📝 Current content nodes:', currentContent?.content?.length || 0);
+
+          // Helper to check if a node is an empty paragraph
+          const isEmptyParagraph = (node: any): boolean => {
+            if (node?.type !== 'paragraph') return false;
+            if (!node.content || node.content.length === 0) return true;
+            // Check if it only contains empty text nodes
+            return node.content.every((child: any) =>
+              child?.type === 'text' && (!child.text || child.text.trim() === '')
+            );
+          };
+
+          // Remove trailing empty paragraphs from existing content
+          let existingNodes = [...(currentContent?.content || [])];
+          while (existingNodes.length > 0 && isEmptyParagraph(existingNodes[existingNodes.length - 1])) {
+            existingNodes.pop();
+          }
+          console.log('📝 Existing nodes after trimming empty paragraphs:', existingNodes.length);
+
+          // Merge: append new nodes after existing content
+          const mergedContent = {
+            type: 'doc' as const,
+            content: [
+              ...existingNodes,
+              ...newNodes,
+            ],
+          };
+
+          console.log('📝 Merged content nodes:', mergedContent.content.length);
+
+          // Convert merged TipTap JSON to HTML and set it
+          const mergedHtml = convertTipTapToHtml(mergedContent);
+          console.log('📝 Setting merged content via HTML...');
+
+          await editor.setContent(mergedHtml);
+
+          // Update the last content ref
+          lastContentRef.current = JSON.stringify(mergedContent);
+
+          // Trigger content change callback
+          if (onContentChange) {
+            onContentChange(mergedContent);
+          }
+
+          console.log('📝 ✓ Content appended successfully');
+        } catch (error: any) {
+          console.error('Error appending content:', error);
+          throw error;
+        }
+      }
+    },
+  }), [editor, forceContentUpdate, onContentChange]);
 
   if (!editable) {
     // Read-only mode - inject CSS and height measurement JavaScript

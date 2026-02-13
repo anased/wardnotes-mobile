@@ -2,6 +2,292 @@
 
 This file tracks the complete history of major feature additions, architectural changes, and important fixes for the WardNotes mobile app.
 
+## Learning Questions Feature (February 2026)
+**Status:** ✅ **COMPLETE** - AI-powered clinical learning integrated into note screens
+
+### What Changed
+- Ported "Learn from an encounter" feature from web app to mobile
+- Collapsible section in Create/Edit Note screens for asking clinical learning questions
+- AI-generated educational answers appended to note content (never replaces existing content)
+- Full quota integration with `note_improvement` feature type (2 free uses/month)
+- Inline markdown parsing for proper bold/italic formatting in AI responses
+
+### Feature Capabilities
+
+**1. Clinical Context & Questions Input**
+- Collapsible "Learn from an encounter" section with blue theme
+- Clinical context textarea (max 2000 characters with counter)
+- Dynamic questions list (1-5 questions, add/remove buttons)
+- Real-time validation (requires context + at least one question)
+
+**2. AI-Generated Answers**
+- Calls web API: `POST https://wardnotes.vercel.app/api/answer-questions`
+- Uses same backend as web app (no code duplication)
+- Bearer token authentication via Supabase session
+- Loading state with informative message
+
+**3. Content Insertion**
+- Answers formatted as TipTap JSON nodes
+- Appended to end of existing note content (preserves all existing text)
+- Trailing empty paragraphs trimmed before appending
+- Includes horizontal rule separator, headings, and formatted Q&A sections
+
+**4. Markdown Formatting Support**
+- Parses inline markdown from AI responses:
+  - `**bold**` → Bold text
+  - `*italic*` → Italic text
+  - `***bold italic***` → Bold + Italic
+- Converts to TipTap text marks for proper rendering
+
+**5. Quota Integration**
+- Uses existing `useQuota()` hook
+- Shows `InlineQuotaIndicator` next to generate button
+- Pre-flight quota check before API call
+- 429 error handling with upgrade prompt
+- Success message shows remaining uses
+
+### Technical Architecture
+
+**New Files Created:**
+```
+src/
+├── types/
+│   └── learningQuestions.ts        # Type definitions (request, response, errors)
+├── services/
+│   └── learningQuestions.ts        # API service calling web backend
+├── components/
+│   └── notes/
+│       └── LearningQuestionsSection.tsx  # Main UI component (collapsible)
+└── utils/
+    └── learningQuestionsFormatter.ts     # TipTap formatter with markdown parsing
+```
+
+**Files Modified:**
+```
+src/
+├── components/
+│   └── notes/
+│       └── TipTapEditor.tsx        # Added appendContent() method to ref
+└── screens/
+    └── notes/
+        ├── CreateNoteScreen.tsx    # Integrated LearningQuestionsSection
+        └── EditNoteScreen.tsx      # Integrated LearningQuestionsSection
+```
+
+**API Integration:**
+```typescript
+// Calls existing web API
+POST https://wardnotes.vercel.app/api/answer-questions
+  Headers: { Authorization: Bearer <token> }
+  Body: { clinicalContext: string, questions: string[] }
+  Response: {
+    answers: [{ question: string, answer: string }],
+    metadata: { generationTime: number, questionCount: number },
+    quota: { used: number, limit: number, remaining: number }
+  }
+```
+
+**Type Definitions:**
+```typescript
+export interface LearningQuestionsRequest {
+  clinicalContext: string;
+  questions: string[];
+}
+
+export interface QuestionAnswer {
+  question: string;
+  answer: string;
+}
+
+export interface LearningQuestionsResponse {
+  answers: QuestionAnswer[];
+  metadata: { generationTime: number; questionCount: number };
+  quota: { used: number; limit: number; remaining: number };
+}
+
+export type LearningQuestionsStatus = 'idle' | 'loading' | 'success' | 'error';
+```
+
+**TipTap Formatter:**
+```typescript
+// Converts AI answers to TipTap nodes
+export function formatAnswersToTipTap(
+  clinicalContext: string,
+  answers: QuestionAnswer[]
+): TipTapNode[] {
+  // Returns array of nodes:
+  // - Horizontal rule separator
+  // - H2: "Learning from this Encounter"
+  // - H3: "Clinical Context" + context paragraph
+  // - H3: "Learning Questions & Answers"
+  // - For each Q&A: H4 question + answer paragraphs with formatting
+}
+
+// Parses **bold**, *italic*, ***bold italic*** to TipTap marks
+function parseInlineMarkdown(text: string): TipTapNode[]
+```
+
+**TipTapEditor appendContent Method:**
+```typescript
+appendContent: async (newNodes: any[]) => {
+  // Get current content
+  const currentContent = await editor.getJSON();
+
+  // Trim trailing empty paragraphs
+  let existingNodes = [...(currentContent?.content || [])];
+  while (existingNodes.length > 0 && isEmptyParagraph(existingNodes[existingNodes.length - 1])) {
+    existingNodes.pop();
+  }
+
+  // Merge and set content
+  const mergedContent = {
+    type: 'doc',
+    content: [...existingNodes, ...newNodes],
+  };
+  await editor.setContent(convertTipTapToHtml(mergedContent));
+}
+```
+
+### UI Design
+
+**Collapsible Section:**
+- Blue theme: `backgroundColor: '#eff6ff'`, `borderColor: '#bfdbfe'`
+- Header: Lightbulb icon + "Learn from an encounter" + chevron
+- Expands to show form inputs
+
+**Form Elements:**
+- Clinical context: Multiline TextInput with character counter
+- Questions: Numbered list with add/remove controls
+- Error display: Red background with retry button
+- Submit button: "Answer My Questions" with flash icon
+- Quota indicator: Inline badge showing remaining uses
+
+**Loading State:**
+- Button shows ActivityIndicator + "Generating..."
+- Hint text: "AI is analyzing your clinical context..."
+
+### Error Handling
+
+**Pre-flight Quota Check:**
+- Checks `canUseFeature('note_improvement')` before API call
+- Shows alert with days until reset and upgrade option
+
+**API Error Handling:**
+- Network errors: Generic retry message
+- 429 Quota exceeded: Upgrade prompt with quota details
+- Validation errors: Form validation prevents submission
+
+### User Flow
+
+```
+1. User opens Create/Edit Note screen
+2. Taps "Learn from an encounter" section → expands
+3. Enters clinical context (e.g., "65-year-old with new glioma...")
+4. Adds learning questions (e.g., "What are radiological features?")
+5. Taps "Answer My Questions" button
+6. Loading state shown while AI generates answers
+7. Success: Answers appended to note, form resets, section collapses
+8. Alert shows remaining quota uses
+```
+
+### Testing Checklist
+
+✅ Collapsible section expands/collapses correctly
+✅ Clinical context input with character counter
+✅ Questions list add/remove functionality
+✅ Form validation (requires context + question)
+✅ API call with authentication
+✅ Answers appended to note (not replacing)
+✅ Markdown formatting renders correctly (bold, italic)
+✅ Quota indicator shows remaining uses
+✅ Error handling for network/quota issues
+✅ Success message with quota info
+
+### Impact
+
+- **Feature Parity:** Mobile now has same learning feature as web app
+- **Educational Value:** Users can learn from clinical encounters while documenting
+- **Quota System:** Consistent with web app's freemium model
+- **Content Safety:** Answers always appended, never replace existing notes
+- **Cross-Platform:** Uses same backend API, ensures consistency
+
+---
+
+## Note Screen Refactor (February 2026)
+**Status:** ✅ **COMPLETE** - Consolidated editor components and simplified screen logic
+
+### What Changed
+- Removed standalone `EditorKeyboardToolbar` component and integrated toolbar functionality into `TipTapEditor`
+- Added new `TagChipInput` component for improved tag management UI
+- Simplified `CreateNoteScreen` and `EditNoteScreen` by reducing duplicated logic
+- Refactored `NoteDetailScreen` UI layout for better organization
+- Added `toolbarItems` utility for centralized toolbar configuration
+- Updated `tiptapConverter` and `editorStyles` for consistency
+
+### Technical Details
+
+**Component Consolidation:**
+- `EditorKeyboardToolbar.tsx` (137 lines) was removed
+- Toolbar functionality moved directly into `TipTapEditor.tsx` (+154 lines)
+- Single source of truth for editor configuration and toolbar behavior
+
+**New TagChipInput Component:**
+- Located at `src/components/ui/TagChipInput.tsx` (265 lines)
+- Provides chip-based tag input with autocomplete
+- Reusable across note creation and editing screens
+
+**Screen Simplifications:**
+- `CreateNoteScreen.tsx`: Reduced by ~132 lines through component reuse
+- `EditNoteScreen.tsx`: Reduced by ~108 lines through component reuse
+- Both screens now delegate editor logic to `TipTapEditor`
+
+**New Utilities:**
+- `src/utils/toolbarItems.ts` (66 lines): Centralized toolbar item definitions
+- `src/assets/image-icon.png`: Image toolbar icon asset
+
+### Files Created
+```
+src/
+├── components/
+│   └── ui/
+│       └── TagChipInput.tsx          # Tag management UI component
+├── utils/
+│   └── toolbarItems.ts               # Toolbar configuration utility
+└── assets/
+    └── image-icon.png                # Image icon asset
+```
+
+### Files Modified
+```
+src/
+├── components/
+│   ├── notes/
+│   │   ├── TipTapEditor.tsx          # Integrated toolbar, expanded functionality
+│   │   └── EditorKeyboardToolbar.tsx # DELETED
+│   └── auth/
+│       └── GoogleLoginButton.tsx     # Minor updates
+├── screens/
+│   └── notes/
+│       ├── CreateNoteScreen.tsx      # Simplified logic
+│       ├── EditNoteScreen.tsx        # Simplified logic
+│       └── NoteDetailScreen.tsx      # Refactored UI layout
+├── constants/
+│   └── editorStyles.ts               # Added new styles
+├── utils/
+│   └── tiptapConverter.ts            # Enhanced conversion logic
+└── services/
+    └── supabase/
+        └── client.ts                 # Minor updates
+```
+
+### Impact
+- **Reduced Code Duplication:** ~441 lines removed, ~765 lines added with better organization
+- **Improved Maintainability:** Single editor component handles all editing scenarios
+- **Better UX:** TagChipInput provides more intuitive tag management
+- **Cleaner Architecture:** Screen components focus on layout, editor handles its own logic
+
+---
+
 ## Freemium Pricing with Monthly Usage Quotas (December 2025)
 **Status:** ✅ **COMPLETE** - Full freemium model with soft paywall and quota tracking
 

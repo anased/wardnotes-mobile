@@ -23,6 +23,7 @@ import useCategories from '../../hooks/useCategories';
 import useTags from '../../hooks/useTags';
 import TipTapEditor, { TipTapEditorRef } from '../../components/notes/TipTapEditor';
 import TagChipInput from '../../components/ui/TagChipInput';
+import LearningQuestionsSection from '../../components/notes/LearningQuestionsSection';
 import { createImageToolbarItem } from '../../utils/toolbarItems';
 
 // Custom toolbar items with image support
@@ -487,6 +488,16 @@ export default function EditNoteScreen() {
               placeholder="Add tag..."
             />
           </View>
+
+          {/* Learning Questions Section */}
+          <LearningQuestionsSection
+            onAnswersGenerated={(newNodes) => {
+              // Append AI-generated answers to the end of the note
+              if (editorRef.current) {
+                editorRef.current.appendContent(newNodes);
+              }
+            }}
+          />
 
           <View style={styles.editorContainer}>
             <Text style={styles.label}>Content</Text>

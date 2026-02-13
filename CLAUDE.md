@@ -77,6 +77,8 @@ src/
 
 | Date | Feature | Details |
 |------|---------|---------|
+| Feb 2026 | Learning Questions | AI-powered clinical learning feature - enter context & questions, get educational answers appended to notes. See CHANGELOG.md |
+| Feb 2026 | Note Screen Refactor | Consolidated editor components into TipTapEditor, added TagChipInput component, simplified Create/Edit/Detail screens. See CHANGELOG.md |
 | Dec 2025 | Freemium Pricing with Quotas | Soft paywall with monthly usage limits (3 flashcard generations for free users). See CHANGELOG.md |
 | Nov 2025 | AI Flashcard Generation | Full generation with preview/edit/save. See CHANGELOG.md |
 | Nov 2025 | Flashcard Management | CRUD operations, FlashcardListModal. See CHANGELOG.md |
